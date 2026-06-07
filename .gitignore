@@ -1,4 +1,5 @@
 .env
+amo_data.json
 __pycache__/
 *.pyc
-microservice.log
+*.log
