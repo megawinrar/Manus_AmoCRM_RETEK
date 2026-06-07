@@ -213,3 +213,8 @@ diagrams/airtable_pipeline_mermaid.md
 - Добавлена логика масштабирования команд и WIP-лимитов.
 - Обновлён классификатор направлений: специнструмент по чертежам объединяет твердосплав, быстрорез, алмазный и прочий инструмент по ТЗ/эскизу/образцу.
 - Airtable-файл помечен как deprecated.
+
+
+# 2026-06-07 — PATCH5_AMOCRM_CLEAN_LOGIC
+
+Проведён аудит PATCH4 на противоречия с новой amoCRM-логикой. Старые Odoo/Airtable-файлы и старые training examples перенесены в `legacy_old_logic/`. Добавлены канонические amoCRM-файлы `04_карточка_сделки_amoCRM.md`, `07_воронка_и_статусы_amoCRM.md`, `12_LLM_CLASSIFIER_AMOCRM_RULES_CANONICAL.md`, `20_PATCH5_AUDIT_CONTRADICTIONS.md`.

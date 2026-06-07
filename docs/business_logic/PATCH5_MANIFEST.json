@@ -1,0 +1,19 @@
+{
+  "patch": "PATCH5_AMOCRM_CLEAN_LOGIC",
+  "date": "2026-06-07",
+  "purpose": "Очистка архива от противоречий старой Odoo/Airtable-логики и фиксация канонической amoCRM-структуры.",
+  "canonical_files": [
+    "00_START_контекст_для_новой_сессии.md",
+    "01_роли_и_ответственность.md",
+    "02_процесс_MVP.md",
+    "04_карточка_сделки_amoCRM.md",
+    "07_воронка_и_статусы_amoCRM.md",
+    "12_LLM_CLASSIFIER_AMOCRM_RULES_CANONICAL.md",
+    "16_AMOCRM_ТЗ_логика_и_поля.md",
+    "17_ARCHIVE_логика_архивов_и_переноса.md",
+    "18_SCALE_масштабирование_команд_и_WIP.md",
+    "19_MICROSERVICE_amoCRM_API_архиватор.md"
+  ],
+  "legacy_folder": "legacy_old_logic/",
+  "file_count": 37
+}
