@@ -97,7 +97,7 @@ class Fields:
     TEAM = int(os.getenv("FIELD_TEAM", "380327"))
     NEEDS_PURCHASING = int(os.getenv("FIELD_NEEDS_PURCH", "380329"))
     SOZ_DOUBTS = int(os.getenv("FIELD_SOZ_DOUBTS", "380331"))
-    KP_STATUS = int(os.getenv("FIELD_KP_STATUS", "380333"))
+    # KP_STATUS (380333) — удалено: дублировало статус воронки
     DEALER = int(os.getenv("FIELD_DEALER", "380335"))
     DEALER_DECISION = int(os.getenv("FIELD_DEALER_DEC", "380337"))
     PRODUCTION = int(os.getenv("FIELD_PRODUCTION", "380339"))
