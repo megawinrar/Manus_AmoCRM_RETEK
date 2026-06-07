@@ -1,0 +1,136 @@
+{
+  "archive": "PATCH3_AIRTABLE_ROUTING",
+  "files_count": 26,
+  "files": [
+    {
+      "path": "00_ARCHIVE_UPDATE_NOTE.md",
+      "size": 2846,
+      "sha256": "f655376c08efa59c"
+    },
+    {
+      "path": "00_README_контекст_проекта.md",
+      "size": 3764,
+      "sha256": "03a6d56c806cc3f3"
+    },
+    {
+      "path": "00_START_контекст_для_новой_сессии.md",
+      "size": 16233,
+      "sha256": "c9d66131ac9e8881"
+    },
+    {
+      "path": "01_роли_и_ответственность.md",
+      "size": 6416,
+      "sha256": "b6a12cbcbcf2be4d"
+    },
+    {
+      "path": "02_процесс_MVP.md",
+      "size": 4182,
+      "sha256": "de4c37c61fe957d3"
+    },
+    {
+      "path": "03_структура_папок_облако.md",
+      "size": 4598,
+      "sha256": "b805866a91a45859"
+    },
+    {
+      "path": "04_карточка_тендерной_возможности_Odoo.md",
+      "size": 6917,
+      "sha256": "7e8f01408f65786d"
+    },
+    {
+      "path": "05_справочники_и_приоритеты.md",
+      "size": 4702,
+      "sha256": "c1e9a735d8e8f170"
+    },
+    {
+      "path": "06_глоссарий_и_правила_классификации_LLM.md",
+      "size": 54084,
+      "sha256": "abe490f57c34dc93"
+    },
+    {
+      "path": "06_глоссарий_направлений.md",
+      "size": 10981,
+      "sha256": "d2c135de843cf9fa"
+    },
+    {
+      "path": "07_воронка_и_статусы_Odoo.md",
+      "size": 3852,
+      "sha256": "e21d6c00063aad91"
+    },
+    {
+      "path": "08_автоматизации_и_напоминания.md",
+      "size": 4058,
+      "sha256": "391e2137f554fd81"
+    },
+    {
+      "path": "09_ИИ_помощник_для_заполнения.md",
+      "size": 3363,
+      "sha256": "203593153d272e17"
+    },
+    {
+      "path": "10_регламенты_сотрудников.md",
+      "size": 2870,
+      "sha256": "519cc6bef6286e29"
+    },
+    {
+      "path": "12_тренировка_LLM_классификатора.md",
+      "size": 130198,
+      "sha256": "e7f55760f0a23cac"
+    },
+    {
+      "path": "13_llm_training_examples.jsonl",
+      "size": 197671,
+      "sha256": "56f46fe3cae095f9"
+    },
+    {
+      "path": "14_HANDOFF_new_session.md",
+      "size": 17187,
+      "sha256": "7e735bddf82e36d4"
+    },
+    {
+      "path": "15_ANTI_ERROR_CHECKLIST.md",
+      "size": 7186,
+      "sha256": "04c9aa802cafbe7d"
+    },
+    {
+      "path": "16_AIRTABLE_ТЗ_логика_и_поля.md",
+      "size": 4510,
+      "sha256": "8e2a4606e2f7273e"
+    },
+    {
+      "path": "99_CHANGELOG.md",
+      "size": 16247,
+      "sha256": "6eb96d2911657582"
+    },
+    {
+      "path": "diagrams/airtable_pipeline_mermaid.md",
+      "size": 1393,
+      "sha256": "0f7709baea1d014d"
+    },
+    {
+      "path": "diagrams/xmind_outline_алгоритм_распределения.md",
+      "size": 2537,
+      "sha256": "fa414f60f44bc38b"
+    },
+    {
+      "path": "diagrams/алгоритм_распределения_заявок_xmind_style_generated.png",
+      "size": 1020719,
+      "sha256": "de28517fc342e622"
+    },
+    {
+      "path": "diagrams/алгоритм_распределения_заявок_в_диаграмме.png",
+      "size": 1020719,
+      "sha256": "de28517fc342e622"
+    },
+    {
+      "path": "diagrams/схема_процесса_crm_odoo.png",
+      "size": 996940,
+      "sha256": "38db79eeeb2dc522"
+    },
+    {
+      "path": "diagrams/схема_процесса_crm_odoo_generated.png",
+      "size": 996940,
+      "sha256": "38db79eeeb2dc522"
+    }
+  ]
+}

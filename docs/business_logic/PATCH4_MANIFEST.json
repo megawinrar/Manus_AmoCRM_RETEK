@@ -1,0 +1,28 @@
+{
+  "patch": "PATCH4_AMOCRM_ARCHIVE_LOGIC",
+  "date": "2026-06-07",
+  "base": "PATCH3_AIRTABLE_ROUTING",
+  "target_crm": "amoCRM",
+  "integration_type": "external_integration",
+  "private_integration": false,
+  "main_pipeline": "Тендеры RETEK — активная работа",
+  "archive_pipelines": [
+    "Архив — направления",
+    "Архив — СОЗ / развитие"
+  ],
+  "key_rule": "В активной воронке живёт только то, по чему есть следующее действие.",
+  "routing": {
+    "P1_P2_P3_SOZ": "Сотрудник 2",
+    "P1_P2_P3_REAL_TENDER": "Сотрудник 3",
+    "UNCLEAR": "Сотрудник 2, возможна передача Сотруднику 3",
+    "P4": "Наблюдаем / В базу / Архив"
+  },
+  "new_files": [
+    "16_AMOCRM_ТЗ_логика_и_поля.md",
+    "17_ARCHIVE_логика_архивов_и_переноса.md",
+    "18_SCALE_масштабирование_команд_и_WIP.md",
+    "19_MICROSERVICE_amoCRM_API_архиватор.md",
+    "diagrams/amocrm_active_pipeline_mermaid.md",
+    "diagrams/archive_routing_mermaid.md"
+  ]
+}
