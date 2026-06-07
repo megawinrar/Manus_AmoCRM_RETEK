@@ -22,6 +22,7 @@ from .config import (
     Fields,
     Users,
     get_status_task_rules,
+    get_status_note_map,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,13 +109,22 @@ async def _handle_status_change(body: dict) -> dict:
         logger.debug(f"Ignoring: pipeline {pipeline_id} != active {PIPELINE_ACTIVE}")
         return {"status": "ignored", "reason": "not_active_pipeline"}
 
+    client = get_amo_client()
+
+    # Записываем заметку в ленту карточки для любого статуса
+    note_map = get_status_note_map()
+    note_text = note_map.get(new_status_id)
+    if note_text:
+        client.add_note(lead_id=lead_id, text=note_text)
+        logger.info(f"Note added to lead {lead_id} for status {new_status_id}")
+
     # Ищем правило для нового статуса
     rules = get_status_task_rules()
     rule = rules.get(new_status_id)
 
     if not rule:
         logger.debug(f"No task rule for status_id={new_status_id}")
-        return {"status": "ok", "action": "no_rule_for_status"}
+        return {"status": "ok", "action": "note_added_no_task_rule", "lead_id": lead_id}
 
     # Определяем ответственного за задачу
     task_responsible = rule.get("responsible_user_id")
@@ -127,7 +137,6 @@ async def _handle_status_change(body: dict) -> dict:
         task_responsible = Users.EMPLOYEE_2_SALES
 
     # Создаём задачу
-    client = get_amo_client()
     task = client.create_task(
         lead_id=lead_id,
         text=rule["text"],
@@ -146,6 +155,7 @@ async def _handle_status_change(body: dict) -> dict:
             "action": "task_created",
             "lead_id": lead_id,
             "task_id": task.get("id"),
+            "note_added": bool(note_text),
         }
     else:
         logger.error(f"Failed to create task for lead {lead_id}")
