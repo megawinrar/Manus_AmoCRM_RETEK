@@ -454,27 +454,23 @@ PRIORITY_LABELS = {
 
 def build_lead_name(
     priority_enum_id: int,
-    situation_type: str,
     customer: str,
-    product_hint: str,
     deadline_str: str,
+    situation_type: str = "",
+    product_hint: str = "",
 ) -> str:
     """
-    Строит стандартизированное название сделки.
-    Пример: "🔴 СРОЧНО | Запрос котировок — КБП Шипунова — фрезы ZPS-FN — срок 08.06"
+    Строит короткое название сделки для канбан-карточки (~31 символ).
+    Формат: "🔴 СРОЧНО — КБП Шипунова — 08.06"
+    Заказчик сокращается до 20 символов чтобы всё влезло в канбан-карточку.
     """
     prefix = PRIORITY_LABELS.get(priority_enum_id, "⚪")
-    # Сокращаем заказчика до 30 символов
-    customer_short = customer[:30].strip() if customer else ""
-    # Сокращаем подсказку по товару до 25 символов
-    product_short = product_hint[:25].strip() if product_hint else ""
-    parts = [prefix, situation_type]
+    customer_short = customer[:20].strip() if customer else ""
+    parts = [prefix]
     if customer_short:
         parts.append(customer_short)
-    if product_short:
-        parts.append(product_short)
     if deadline_str:
-        parts.append(f"срок {deadline_str}")
+        parts.append(deadline_str)
     return " — ".join(parts)
 
 
