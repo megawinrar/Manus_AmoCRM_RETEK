@@ -24,8 +24,9 @@ os.environ.setdefault("STATUS_5_PURCHASING", "100005")
 os.environ.setdefault("STATUS_6_KP_PREP", "100006")
 os.environ.setdefault("STATUS_7_KP_DEALER", "100007")
 os.environ.setdefault("STATUS_8_DEALER_DEC", "100008")
-os.environ.setdefault("STATUS_9_PRODUCTION", "100009")
-os.environ.setdefault("STATUS_10_ARCHIVE", "100010")
+os.environ.setdefault("STATUS_9_BIDDING", "100009")
+os.environ.setdefault("STATUS_10_PRODUCTION", "100010")
+os.environ.setdefault("STATUS_11_ARCHIVE", "100011")
 os.environ.setdefault("ARCH_DIR_SPEC", "200001")
 os.environ.setdefault("ARCH_DIR_HSS", "200002")
 os.environ.setdefault("ARCH_DIR_CARBIDE", "200003")
@@ -80,7 +81,9 @@ class TestConfig:
     def test_active_statuses_loaded(self):
         """Проверяем что статусы загружены из env."""
         assert ActiveStatuses.LLM_RECOGNIZED == 100001
-        assert ActiveStatuses.TO_ARCHIVE == 100010
+        assert ActiveStatuses.BIDDING == 100009
+        assert ActiveStatuses.PRODUCTION == 100010
+        assert ActiveStatuses.TO_ARCHIVE == 100011
 
     def test_archive_statuses_loaded(self):
         """Проверяем что архивные статусы загружены."""
@@ -96,7 +99,7 @@ class TestConfig:
     def test_status_task_rules(self):
         """Проверяем правила создания задач."""
         rules = get_status_task_rules()
-        assert len(rules) == 5  # 5 статусов с правилами
+        assert len(rules) == 6  # 6 статусов с правилами (добавлен BIDDING)
 
         # LLM распознал → задача Сотруднику 2
         rule = rules[100001]
@@ -108,6 +111,11 @@ class TestConfig:
         rule = rules[100005]
         assert rule["responsible_user_id"] == Users.EMPLOYEE_3_BUYER
         assert rule["deadline_seconds"] == 2 * 24 * 3600
+
+        # Торги → задача ответственному за сделку
+        rule = rules[100009]
+        assert rule["responsible_user_id"] is None  # _LEAD_RESPONSIBLE
+        assert rule["deadline_seconds"] == 24 * 3600
 
     def test_routing_soz(self):
         """Проверяем маршрутизацию: Р1 + СОЗ → СОЗ-звонок, Сотрудник 2."""

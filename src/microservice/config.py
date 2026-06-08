@@ -27,21 +27,32 @@ PIPELINE_ARCHIVE_SOZ = 10985038     # Архив — СОЗ / развитие
 # ═══════════════════════════════════════════════════════════════════
 # СТАТУСЫ АКТИВНОЙ ВОРОНКИ
 # ═══════════════════════════════════════════════════════════════════
-# Заполняется из amoCRM API при первом запуске (или вручную)
-# Формат: STATUS_<НОМЕР>_<КРАТКОЕ_ИМЯ> = status_id
+# Воронка: RETEK ТЕНДЕРЫ (pipeline 10984442)
+# sort=20  id=86357690  "1. LLM распознал"
+# sort=30  id=86357686  "2. Проверка Сотрудника 2"
+# sort=40  id=86357682  "3. СОЗ — звонок / уточнить дату"
+# sort=50  id=86357678  "4. СОЗ — ждём реальный торг"
+# sort=60  id=86357674  "5. Передано в закупку / расчёт"
+# sort=70  id=86357670  "6. КП готовится"
+# sort=80  id=86357666  "7. КП передано дилеру"
+# sort=90  id=86357662  "8. Решение дилера"
+# sort=100 id=86357658  "9. Торги"
+# sort=110 id=86357918  "10. Производство"
+# sort=120 id=86357654  "11. К архивированию"
 
 class ActiveStatuses:
     """Статусы воронки 'RETEK ТЕНДЕРЫ'."""
-    LLM_RECOGNIZED = int(os.getenv("STATUS_1_LLM", "0"))
-    CHECK_EMPLOYEE2 = int(os.getenv("STATUS_2_CHECK", "0"))
-    SOZ_CALL = int(os.getenv("STATUS_3_SOZ_CALL", "0"))
-    SOZ_WAIT = int(os.getenv("STATUS_4_SOZ_WAIT", "0"))
-    PURCHASING = int(os.getenv("STATUS_5_PURCHASING", "0"))
-    KP_PREPARING = int(os.getenv("STATUS_6_KP_PREP", "0"))
-    KP_SENT_DEALER = int(os.getenv("STATUS_7_KP_DEALER", "0"))
-    DEALER_DECISION = int(os.getenv("STATUS_8_DEALER_DEC", "0"))
-    PRODUCTION = int(os.getenv("STATUS_9_PRODUCTION", "0"))
-    TO_ARCHIVE = int(os.getenv("STATUS_10_ARCHIVE", "0"))
+    LLM_RECOGNIZED  = int(os.getenv("STATUS_1_LLM",        "0"))  # 1. LLM распознал
+    CHECK_EMPLOYEE2 = int(os.getenv("STATUS_2_CHECK",       "0"))  # 2. Проверка Сотрудника 2
+    SOZ_CALL        = int(os.getenv("STATUS_3_SOZ_CALL",    "0"))  # 3. СОЗ — звонок
+    SOZ_WAIT        = int(os.getenv("STATUS_4_SOZ_WAIT",    "0"))  # 4. СОЗ — ждём дату
+    PURCHASING      = int(os.getenv("STATUS_5_PURCHASING",  "0"))  # 5. Передано в закупку
+    KP_PREPARING    = int(os.getenv("STATUS_6_KP_PREP",     "0"))  # 6. КП готовится
+    KP_SENT_DEALER  = int(os.getenv("STATUS_7_KP_DEALER",   "0"))  # 7. КП передано дилеру
+    DEALER_DECISION = int(os.getenv("STATUS_8_DEALER_DEC",  "0"))  # 8. Решение дилера
+    BIDDING         = int(os.getenv("STATUS_9_BIDDING",     "0"))  # 9. Торги
+    PRODUCTION      = int(os.getenv("STATUS_10_PRODUCTION", "0"))  # 10. Производство
+    TO_ARCHIVE      = int(os.getenv("STATUS_11_ARCHIVE",    "0"))  # 11. К архивированию
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -50,23 +61,23 @@ class ActiveStatuses:
 
 class ArchiveDirectionsStatuses:
     """Статусы воронки 'Архив — Направления'."""
-    SPEC_DRAWING = int(os.getenv("ARCH_DIR_SPEC", "0"))
-    HSS_GOST = int(os.getenv("ARCH_DIR_HSS", "0"))
-    CARBIDE = int(os.getenv("ARCH_DIR_CARBIDE", "0"))
-    DIAMOND = int(os.getenv("ARCH_DIR_DIAMOND", "0"))
-    OUT_OF_SCOPE = int(os.getenv("ARCH_DIR_OUT", "0"))
-    DUPLICATES = int(os.getenv("ARCH_DIR_DUPL", "0"))
-    NEEDS_CHECK = int(os.getenv("ARCH_DIR_CHECK", "0"))
+    SPEC_DRAWING = int(os.getenv("ARCH_DIR_SPEC",    "0"))
+    HSS_GOST     = int(os.getenv("ARCH_DIR_HSS",     "0"))
+    CARBIDE      = int(os.getenv("ARCH_DIR_CARBIDE", "0"))
+    DIAMOND      = int(os.getenv("ARCH_DIR_DIAMOND", "0"))
+    OUT_OF_SCOPE = int(os.getenv("ARCH_DIR_OUT",     "0"))
+    DUPLICATES   = int(os.getenv("ARCH_DIR_DUPL",    "0"))
+    NEEDS_CHECK  = int(os.getenv("ARCH_DIR_CHECK",   "0"))
 
 
 class ArchiveSozStatuses:
     """Статусы воронки 'Архив — СОЗ / развитие'."""
-    WAITING_REAL_TENDER = int(os.getenv("ARCH_SOZ_WAIT", "0"))
-    TO_CALL = int(os.getenv("ARCH_SOZ_CALL", "0"))
-    REPEAT_30_DAYS = int(os.getenv("ARCH_SOZ_30D", "0"))
-    REPEAT_90_DAYS = int(os.getenv("ARCH_SOZ_90D", "0"))
-    INTERESTING_FACTORY = int(os.getenv("ARCH_SOZ_FACTORY", "0"))
-    IRRELEVANT = int(os.getenv("ARCH_SOZ_IRRELEVANT", "0"))
+    WAITING_REAL_TENDER  = int(os.getenv("ARCH_SOZ_WAIT",       "0"))
+    TO_CALL              = int(os.getenv("ARCH_SOZ_CALL",       "0"))
+    REPEAT_30_DAYS       = int(os.getenv("ARCH_SOZ_30D",        "0"))
+    REPEAT_90_DAYS       = int(os.getenv("ARCH_SOZ_90D",        "0"))
+    INTERESTING_FACTORY  = int(os.getenv("ARCH_SOZ_FACTORY",    "0"))
+    IRRELEVANT           = int(os.getenv("ARCH_SOZ_IRRELEVANT", "0"))
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -76,38 +87,38 @@ class ArchiveSozStatuses:
 
 class Fields:
     """ID кастомных полей сделки."""
-    EXTERNAL_ID = int(os.getenv("FIELD_EXTERNAL_ID", "380291"))
-    SOURCE = int(os.getenv("FIELD_SOURCE", "380293"))
-    PLATFORM_URL = int(os.getenv("FIELD_PLATFORM_URL", "380295"))
-    DOCS_URL = int(os.getenv("FIELD_DOCS_URL", "380297"))
-    CUSTOMER = int(os.getenv("FIELD_CUSTOMER", "380299"))
-    INN = int(os.getenv("FIELD_INN", "380301"))
-    PROCEDURE_NUMBER = int(os.getenv("FIELD_PROCEDURE_NUM", "380303"))
-    SITUATION_TYPE = int(os.getenv("FIELD_SITUATION_TYPE", "380305"))
-    PROCEDURE_TYPE = int(os.getenv("FIELD_PROCEDURE_TYPE", "380307"))
-    PRIORITY = int(os.getenv("FIELD_PRIORITY", "380309"))
-    DIRECTION = int(os.getenv("FIELD_DIRECTION", "380311"))
-    SUB_DIRECTION = int(os.getenv("FIELD_SUB_DIRECTION", "380313"))
-    NMC = int(os.getenv("FIELD_NMC", "380315"))
-    DEADLINE = int(os.getenv("FIELD_DEADLINE", "380317"))
-    NEXT_ACTION = int(os.getenv("FIELD_NEXT_ACTION", "380319"))
-    NEXT_ACTION_DATE = int(os.getenv("FIELD_NEXT_ACTION_DATE", "380321"))
-    RESPONSIBLE_SALES = int(os.getenv("FIELD_RESP_SALES", "380323"))
-    RESPONSIBLE_BUYER = int(os.getenv("FIELD_RESP_BUYER", "380325"))
-    TEAM = int(os.getenv("FIELD_TEAM", "380327"))
-    NEEDS_PURCHASING = int(os.getenv("FIELD_NEEDS_PURCH", "380329"))
-    SOZ_DOUBTS = int(os.getenv("FIELD_SOZ_DOUBTS", "380331"))
-    # KP_STATUS (380333) — удалено: дублировало статус воронки
-    DEALER = int(os.getenv("FIELD_DEALER", "380335"))
-    DEALER_DECISION = int(os.getenv("FIELD_DEALER_DEC", "380337"))
-    PRODUCTION = int(os.getenv("FIELD_PRODUCTION", "380339"))
-    CLOSE_REASON = int(os.getenv("FIELD_CLOSE_REASON", "380341"))
-    ARCHIVE_DEST_LLM = int(os.getenv("FIELD_ARCH_DEST_LLM", "380343"))
-    ARCHIVE_DEST_FINAL = int(os.getenv("FIELD_ARCH_DEST_FINAL", "380345"))
-    RETURN_DATE = int(os.getenv("FIELD_RETURN_DATE", "380347"))
-    LLM_CONFIDENCE = int(os.getenv("FIELD_LLM_CONFIDENCE", "380349"))
-    LLM_COMMENT = int(os.getenv("FIELD_LLM_COMMENT", "380351"))
-    MANAGER_COMMENT = int(os.getenv("FIELD_MANAGER_COMMENT", "380353"))
+    EXTERNAL_ID      = int(os.getenv("FIELD_EXTERNAL_ID",    "380291"))
+    SOURCE           = int(os.getenv("FIELD_SOURCE",          "380293"))
+    PLATFORM_URL     = int(os.getenv("FIELD_PLATFORM_URL",    "380295"))
+    DOCS_URL         = int(os.getenv("FIELD_DOCS_URL",        "380297"))
+    CUSTOMER         = int(os.getenv("FIELD_CUSTOMER",        "380299"))
+    INN              = int(os.getenv("FIELD_INN",             "380301"))
+    PROCEDURE_NUMBER = int(os.getenv("FIELD_PROCEDURE_NUM",   "380303"))
+    SITUATION_TYPE   = int(os.getenv("FIELD_SITUATION_TYPE",  "380305"))
+    PROCEDURE_TYPE   = int(os.getenv("FIELD_PROCEDURE_TYPE",  "380307"))
+    PRIORITY         = int(os.getenv("FIELD_PRIORITY",        "380309"))
+    DIRECTION        = int(os.getenv("FIELD_DIRECTION",       "380311"))
+    SUB_DIRECTION    = int(os.getenv("FIELD_DIRECTION_SUBTYPE","380313"))
+    NMC              = int(os.getenv("FIELD_NMC",             "380315"))
+    DEADLINE         = int(os.getenv("FIELD_DEADLINE",        "380317"))
+    NEXT_ACTION      = int(os.getenv("FIELD_NEXT_ACTION",     "380319"))
+    NEXT_ACTION_DATE = int(os.getenv("FIELD_NEXT_ACTION_DATE","380321"))
+    RESPONSIBLE_SALES  = int(os.getenv("FIELD_RESP_SALES",    "380323"))
+    RESPONSIBLE_BUYER  = int(os.getenv("FIELD_RESP_PURCHASE", "380325"))
+    TEAM             = int(os.getenv("FIELD_TEAM",            "380327"))
+    NEEDS_PURCHASING = int(os.getenv("FIELD_NEEDS_PURCHASE",  "380329"))
+    SOZ_DOUBTS       = int(os.getenv("FIELD_SOZ_DOUBT",       "380331"))
+    # FIELD_KP_STATUS (380333) — удалено: дублировало статус воронки
+    DEALER           = int(os.getenv("FIELD_DEALER",          "380335"))
+    DEALER_DECISION  = int(os.getenv("FIELD_DEALER_DECISION", "380337"))
+    PRODUCTION       = int(os.getenv("FIELD_PRODUCTION",      "380339"))
+    CLOSE_REASON     = int(os.getenv("FIELD_CLOSE_REASON",    "380341"))
+    ARCHIVE_DEST_LLM   = int(os.getenv("FIELD_ARCHIVE_LLM",  "380343"))
+    ARCHIVE_DEST_FINAL = int(os.getenv("FIELD_ARCHIVE_FINAL", "380345"))
+    RETURN_DATE      = int(os.getenv("FIELD_RETURN_DATE",     "380347"))
+    LLM_CONFIDENCE   = int(os.getenv("FIELD_LLM_CONFIDENCE",  "380349"))
+    LLM_COMMENT      = int(os.getenv("FIELD_LLM_COMMENT",     "380351"))
+    MANAGER_COMMENT  = int(os.getenv("FIELD_MANAGER_COMMENT", "380353"))
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -118,13 +129,13 @@ class Users:
     """ID пользователей amoCRM."""
     EMPLOYEE_2_SALES = int(os.getenv("USER_EMPLOYEE_2", "0"))  # Продажник/квалификатор
     EMPLOYEE_3_BUYER = int(os.getenv("USER_EMPLOYEE_3", "0"))  # Закупщик/расчётчик
-    MANAGER = int(os.getenv("USER_MANAGER", "0"))              # Руководитель
+    MANAGER          = int(os.getenv("USER_MANAGER",    "0"))  # Руководитель
 
 
 # ═══════════════════════════════════════════════════════════════════
 # ПРАВИЛА АВТОЗАДАЧ ПРИ СМЕНЕ СТАТУСА
 # ═══════════════════════════════════════════════════════════════════
-# Формат: status_id → {text, responsible, deadline_seconds, task_type_id}
+# Формат: status_key → {text, responsible, deadline_seconds, task_type_id}
 # task_type_id: 1=Звонок, 2=Встреча, 3=Написать письмо
 
 STATUS_TASK_RULES = {
@@ -156,7 +167,14 @@ STATUS_TASK_RULES = {
         "deadline_seconds": 3 * 24 * 3600,  # 3 дня
         "task_type_id": 1,
     },
-    # → 10. К архивированию: задача ответственному «Заполнить причину и назначение» (4ч)
+    # → 9. Торги: задача ответственному «Контролировать ход торгов» (1 день)
+    "BIDDING": {
+        "text": "Контролировать ход торгов. После результата — зафиксировать итог и перевести в «Производство» или «К архивированию»",
+        "responsible": "_LEAD_RESPONSIBLE",  # Ответственный за сделку
+        "deadline_seconds": 24 * 3600,  # 1 день
+        "task_type_id": 1,
+    },
+    # → 11. К архивированию: задача ответственному «Заполнить причину и назначение» (4ч)
     "TO_ARCHIVE": {
         "text": "Заполнить причину закрытия и архивное назначение. Указать дату возврата если нужно",
         "responsible": "_LEAD_RESPONSIBLE",  # Специальное значение: ответственный за сделку
@@ -170,10 +188,11 @@ def get_status_task_rules() -> dict:
     """Получить правила с реальными status_id."""
     mapping = {
         "LLM_RECOGNIZED": ActiveStatuses.LLM_RECOGNIZED,
-        "SOZ_CALL": ActiveStatuses.SOZ_CALL,
-        "PURCHASING": ActiveStatuses.PURCHASING,
-        "KP_SENT_DEALER": ActiveStatuses.KP_SENT_DEALER,
-        "TO_ARCHIVE": ActiveStatuses.TO_ARCHIVE,
+        "SOZ_CALL":        ActiveStatuses.SOZ_CALL,
+        "PURCHASING":      ActiveStatuses.PURCHASING,
+        "KP_SENT_DEALER":  ActiveStatuses.KP_SENT_DEALER,
+        "BIDDING":         ActiveStatuses.BIDDING,
+        "TO_ARCHIVE":      ActiveStatuses.TO_ARCHIVE,
     }
     result = {}
     for key, status_id in mapping.items():
@@ -338,30 +357,31 @@ ARCHIVE_REQUIRED_FIELDS = [
     Fields.DIRECTION,            # Направление
     Fields.SUB_DIRECTION,        # Подтип направления
     Fields.CLOSE_REASON,         # Причина закрытия
-    Fields.ARCHIVE_DEST_LLM,    # Архивное назначение LLM
-    Fields.ARCHIVE_DEST_FINAL,  # Архивное назначение итоговое
+    Fields.ARCHIVE_DEST_LLM,     # Архивное назначение LLM
+    Fields.ARCHIVE_DEST_FINAL,   # Архивное назначение итоговое
     Fields.RETURN_DATE,          # Дата возврата из архива
     Fields.NEXT_ACTION,          # Следующее действие
 ]
 
 ARCHIVE_REQUIRED_FIELD_NAMES = {
-    Fields.SITUATION_TYPE: "Тип ситуации",
-    Fields.PRIORITY: "Приоритет",
-    Fields.DIRECTION: "Направление",
-    Fields.SUB_DIRECTION: "Подтип направления",
-    Fields.CLOSE_REASON: "Причина закрытия",
-    Fields.ARCHIVE_DEST_LLM: "Архивное назначение LLM",
+    Fields.SITUATION_TYPE:     "Тип ситуации",
+    Fields.PRIORITY:           "Приоритет",
+    Fields.DIRECTION:          "Направление",
+    Fields.SUB_DIRECTION:      "Подтип направления",
+    Fields.CLOSE_REASON:       "Причина закрытия",
+    Fields.ARCHIVE_DEST_LLM:   "Архивное назначение LLM",
     Fields.ARCHIVE_DEST_FINAL: "Архивное назначение итоговое",
-    Fields.RETURN_DATE: "Дата возврата из архива",
-    Fields.NEXT_ACTION: "Следующее действие",
+    Fields.RETURN_DATE:        "Дата возврата из архива",
+    Fields.NEXT_ACTION:        "Следующее действие",
 }
 
 
-# ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 # ШАБЛОНЫ СООБЩЕНИЙ В ЛЕНТУ КАРТОЧКИ
-# ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 # Пишутся автоматически в ленту карточки при каждой смене статуса.
 # Цель: пояснять что произошло и что делать дальше.
+# Первые 44 символа видны в превью канбан-карточки.
 
 STATUS_NOTE_TEMPLATES = {
     # 1. LLM распознал
@@ -434,19 +454,29 @@ STATUS_NOTE_TEMPLATES = {
         "──────────────────────────────────────────────\n"
         "📌 Заполни поле «Решение дилера»:\n"
         "   Выходим на торги / Не выходим / Не ответил / Торги отменены\n"
-        "➡️ Выходим → «Производство / Торги»\n"
+        "➡️ Выходим → «9. Торги»\n"
         "   Не выходим → «К архивированию» (заполни причину закрытия)"
     ),
-    # 9. Производство / Торги
-    # Канбан-превью (44 симв): "⚔️ Торги! После результата → архив"
-    "PRODUCTION": (
-        "⚔️ Торги! После результата → архив.\n"
-        "────────────────────────────────────\n"
-        "📌 Контролировать ход торгов, зафиксировать результат.\n"
-        "➡️ После торгов → «К архивированию»\n"
+    # 9. Торги
+    # Канбан-превью (44 симв): "⚔️ Торги идут! Следи за ходом и итогом"
+    "BIDDING": (
+        "⚔️ Торги идут! Следи за ходом и итогом.\n"
+        "─────────────────────────────────────────\n"
+        "📌 Контролировать ход торгов, фиксировать результат в реальном времени.\n"
+        "➡️ Выиграли → «10. Производство» (передать в производство)\n"
+        "   Проиграли / Отменены → «11. К архивированию»\n"
         "   Заполни: «Причина закрытия» + «Архивное назначение итоговое»"
     ),
-    # 10. К архивированию
+    # 10. Производство
+    # Канбан-превью (44 симв): "🏭 В производстве. Контроль сроков и отгр"
+    "PRODUCTION": (
+        "🏭 В производстве. Контроль сроков и отгрузки.\n"
+        "───────────────────────────────────────────────\n"
+        "📌 Тендер выигран, передан в производство. Контролировать сроки.\n"
+        "➡️ После отгрузки → «11. К архивированию»\n"
+        "   Заполни: «Причина закрытия» = «Выиграли» + «Архивное назначение»"
+    ),
+    # 11. К архивированию
     # Канбан-превью (44 симв): "🗂️ К архиву. Заполни причину и назначен"
     "TO_ARCHIVE": (
         "🗂️ К архиву. Заполни причину и назначение.\n"
@@ -470,9 +500,28 @@ def get_status_note(status_key: str) -> str:
     return STATUS_NOTE_TEMPLATES.get(status_key, "")
 
 
-# Обратный маппинг: status_id → ключ шаблона
+def get_status_note_map() -> dict:
+    """Маппинг status_id → текст заметки."""
+    return {
+        ActiveStatuses.LLM_RECOGNIZED:  STATUS_NOTE_TEMPLATES["LLM_RECOGNIZED"],
+        ActiveStatuses.CHECK_EMPLOYEE2: STATUS_NOTE_TEMPLATES["CHECK_EMPLOYEE2"],
+        ActiveStatuses.SOZ_CALL:        STATUS_NOTE_TEMPLATES["SOZ_CALL"],
+        ActiveStatuses.SOZ_WAIT:        STATUS_NOTE_TEMPLATES["SOZ_WAIT"],
+        ActiveStatuses.PURCHASING:      STATUS_NOTE_TEMPLATES["PURCHASING"],
+        ActiveStatuses.KP_PREPARING:    STATUS_NOTE_TEMPLATES["KP_PREPARING"],
+        ActiveStatuses.KP_SENT_DEALER:  STATUS_NOTE_TEMPLATES["KP_SENT_DEALER"],
+        ActiveStatuses.DEALER_DECISION: STATUS_NOTE_TEMPLATES["DEALER_DECISION"],
+        ActiveStatuses.BIDDING:         STATUS_NOTE_TEMPLATES["BIDDING"],
+        ActiveStatuses.PRODUCTION:      STATUS_NOTE_TEMPLATES["PRODUCTION"],
+        ActiveStatuses.TO_ARCHIVE:      STATUS_NOTE_TEMPLATES["TO_ARCHIVE"],
+    }
 
-# Метки приоритета в названии сделки (enum_id → префикс)
+
+# ═══════════════════════════════════════════════════════════════════
+# МЕТКИ ПРИОРИТЕТА В НАЗВАНИИ СДЕЛКИ
+# ═══════════════════════════════════════════════════════════════════
+# enum_id → префикс названия сделки
+
 PRIORITY_LABELS = {
     215673: "🔴 СРОЧНО",   # Р1 — Срочно
     215675: "🟡 ВАЖНО",    # Р2 — Важно
@@ -503,23 +552,7 @@ def build_lead_name(
     return " — ".join(parts)
 
 
-def get_status_note_map() -> dict:
-    """Маппинг status_id → текст заметки."""
-    return {
-        ActiveStatuses.LLM_RECOGNIZED:  STATUS_NOTE_TEMPLATES["LLM_RECOGNIZED"],
-        ActiveStatuses.CHECK_EMPLOYEE2: STATUS_NOTE_TEMPLATES["CHECK_EMPLOYEE2"],
-        ActiveStatuses.SOZ_CALL:        STATUS_NOTE_TEMPLATES["SOZ_CALL"],
-        ActiveStatuses.SOZ_WAIT:        STATUS_NOTE_TEMPLATES["SOZ_WAIT"],
-        ActiveStatuses.PURCHASING:      STATUS_NOTE_TEMPLATES["PURCHASING"],
-        ActiveStatuses.KP_PREPARING:    STATUS_NOTE_TEMPLATES["KP_PREPARING"],
-        ActiveStatuses.KP_SENT_DEALER:  STATUS_NOTE_TEMPLATES["KP_SENT_DEALER"],
-        ActiveStatuses.DEALER_DECISION: STATUS_NOTE_TEMPLATES["DEALER_DECISION"],
-        ActiveStatuses.PRODUCTION:      STATUS_NOTE_TEMPLATES["PRODUCTION"],
-        ActiveStatuses.TO_ARCHIVE:      STATUS_NOTE_TEMPLATES["TO_ARCHIVE"],
-    }
-
-
-# ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
 # ТАЙМАУТЫ И ЛИМИТЫ
 # ═══════════════════════════════════════════════════════════════════
 

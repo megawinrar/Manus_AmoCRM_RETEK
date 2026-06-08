@@ -77,7 +77,8 @@ class WeeklyControl:
             ActiveStatuses.KP_PREPARING,
             ActiveStatuses.KP_SENT_DEALER,
             ActiveStatuses.DEALER_DECISION,
-            ActiveStatuses.PRODUCTION,
+            ActiveStatuses.BIDDING,       # 9. Торги
+            ActiveStatuses.PRODUCTION,    # 10. Производство
         ]
 
         for status_id in check_statuses:

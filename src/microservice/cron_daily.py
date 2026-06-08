@@ -66,7 +66,7 @@ class DailyArchiver:
         logger.info("[DAILY] Получаю сделки из статуса 'К архивированию'...")
 
         if not ActiveStatuses.TO_ARCHIVE:
-            logger.error("[DAILY] STATUS_10_ARCHIVE не настроен в .env!")
+            logger.error("[DAILY] STATUS_11_ARCHIVE не настроен в .env!")
             return
 
         leads = self.client.get_all_leads_in_status(
