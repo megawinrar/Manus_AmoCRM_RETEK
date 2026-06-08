@@ -23,6 +23,8 @@ from .config import (
     Users,
     get_status_task_rules,
     get_status_note_map,
+    build_lead_name,
+    PRIORITY_LABELS,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,6 +113,16 @@ async def _handle_status_change(body: dict) -> dict:
 
     client = get_amo_client()
 
+    # ── Автопереименование сделки по формату: 🔴 СРОЧНО — КБП Шипунова — 08.06 ──
+    lead_full = client.get_lead(lead_id)
+    if lead_full:
+        new_name = _build_name_from_lead(lead_full)
+        if new_name:
+            old_name = lead_full.get("name", "")
+            if old_name != new_name:
+                client.update_lead(lead_id, {"name": new_name})
+                logger.info(f"Lead {lead_id} renamed: '{old_name}' → '{new_name}'")
+
     # Записываем заметку в ленту карточки для любого статуса
     note_map = get_status_note_map()
     note_text = note_map.get(new_status_id)
@@ -165,6 +177,44 @@ async def _handle_status_change(body: dict) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 # ОБРАБОТКА СОЗДАНИЯ СДЕЛКИ
 # ═══════════════════════════════════════════════════════════════════
+
+
+def _build_name_from_lead(lead: dict) -> Optional[str]:
+    """
+    Строит короткое название сделки из кастомных полей.
+    Формат: "🔴 СРОЧНО — КБП Шипунова — 08.06"
+    Возвращает None если недостаточно данных.
+    """
+    fields = {f["field_id"]: f["values"] for f in lead.get("custom_fields_values", [])}
+
+    # Приоритет (enum_id)
+    priority_values = fields.get(Fields.PRIORITY, [])
+    priority_enum_id = priority_values[0].get("enum_id") if priority_values else None
+    if not priority_enum_id or priority_enum_id not in PRIORITY_LABELS:
+        return None  # Нет приоритета — не переименовываем
+
+    # Заказчик
+    customer_values = fields.get(Fields.CUSTOMER, [])
+    customer = customer_values[0].get("value", "") if customer_values else ""
+
+    # Срок подачи (unix timestamp → DD.MM)
+    deadline_values = fields.get(Fields.DEADLINE, [])
+    deadline_str = ""
+    if deadline_values:
+        ts = deadline_values[0].get("value")
+        if ts:
+            try:
+                dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+                deadline_str = dt.strftime("%d.%m")
+            except (ValueError, TypeError, OSError):
+                pass
+
+    return build_lead_name(
+        priority_enum_id=priority_enum_id,
+        customer=customer,
+        deadline_str=deadline_str,
+    )
+
 
 async def _handle_lead_add(body: dict) -> dict:
     """Логирование создания новой сделки (информационно)."""
