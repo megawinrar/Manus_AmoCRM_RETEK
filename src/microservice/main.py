@@ -29,6 +29,7 @@ from .cron_hourly import run_hourly
 from .cron_daily import run_daily
 from .cron_weekly import run_weekly
 from .cron_monthly import run_monthly
+from .cron_yadisk import run_yadisk_scan
 
 # ═══════════════════════════════════════════════════════════════════
 # LOGGING
@@ -93,6 +94,16 @@ def _job_weekly():
         logger.error(f"📋 Ошибка еженедельного контроля: {e}", exc_info=True)
 
 
+def _job_yadisk_scan():
+    """Обёртка для сканирования Яндекс.Диска."""
+    logger.info("📂 Запуск сканирования Яндекс.Диска...")
+    try:
+        stats = run_yadisk_scan(dry_run=DRY_RUN)
+        logger.info(f"📂 Сканирование завершено: {stats.get('new_tenders', 0)} новых")
+    except Exception as e:
+        logger.error(f"📂 Ошибка сканирования Яндекс.Диска: {e}", exc_info=True)
+
+
 def _job_monthly():
     """Обёртка для ежемесячного задания."""
     logger.info("📊 Запуск ежемесячной ревизии...")
@@ -132,6 +143,15 @@ def setup_scheduler():
         replace_existing=True,
     )
 
+    # Каждый час в :30 — сканирование Яндекс.Диска
+    scheduler.add_job(
+        _job_yadisk_scan,
+        CronTrigger(minute=30),
+        id="yadisk_scan",
+        name="Сканирование Яндекс.Диска (новые тендеры)",
+        replace_existing=True,
+    )
+
     # 1-го числа каждого месяца в 10:00
     scheduler.add_job(
         _job_monthly,
@@ -142,8 +162,9 @@ def setup_scheduler():
     )
 
     logger.info("📅 Планировщик настроен:")
-    logger.info("  • Ежечасно — :05 каждого часа")
-    logger.info("  • Ежедневно — 02:00")
+    logger.info("  • Ежечасно — :05 каждого часа (контроль Р1/Р2)")
+    logger.info("  • Ежечасно — :30 каждого часа (сканирование Яндекс.Диска)")
+    logger.info("  • Ежедневно — 02:00 (архивация)")
     logger.info("  • Еженедельно — понедельник 09:00")
     logger.info("  • Ежемесячно — 1-е число 10:00")
 
@@ -188,7 +209,7 @@ async def root():
     """Корневой endpoint — информация о сервисе."""
     return {
         "service": "RETEK amoCRM Microservice",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "mode": "dry-run" if DRY_RUN else "production",
         "endpoints": {
             "webhook": "POST /webhook",
@@ -198,6 +219,7 @@ async def root():
             "run_daily": "POST /run/daily",
             "run_weekly": "POST /run/weekly",
             "run_monthly": "POST /run/monthly",
+            "run_yadisk": "POST /run/yadisk",
         },
     }
 
@@ -250,6 +272,13 @@ async def manual_run_monthly():
     """Ручной запуск ежемесячной ревизии."""
     report = run_monthly(dry_run=DRY_RUN)
     return {"status": "completed", "report_date": report.get("date")}
+
+
+@app.post("/run/yadisk")
+async def manual_run_yadisk():
+    """Ручной запуск сканирования Яндекс.Диска."""
+    stats = run_yadisk_scan(dry_run=DRY_RUN)
+    return {"status": "completed", "stats": stats}
 
 
 # ═══════════════════════════════════════════════════════════════════

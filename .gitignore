@@ -3,3 +3,5 @@ amo_data.json
 __pycache__/
 *.pyc
 *.log
+data/processed_tenders.db
+data/llm_logs/
