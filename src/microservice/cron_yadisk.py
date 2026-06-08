@@ -32,6 +32,7 @@ import sqlite3
 import hashlib
 import logging
 import tempfile
+import zipfile
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -348,7 +349,160 @@ def collect_files_recursive(client: YaDiskClient, path: str, depth: int = 0) -> 
     return files
 
 
-# ═══════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════
+# РАСПАКОВКА ZIP-АРХИВОВ
+# ═════════════════════════════════════════════════════════════════
+
+ARCHIVE_EXTENSIONS = {".zip"}
+
+
+def extract_archives(file_paths: list[str], extract_dir: str) -> list[str]:
+    """
+    Проверяет список скачанных файлов — если среди них есть .zip,
+    распаковывает их и возвращает обновлённый список файлов
+    (архивы заменены на их содержимое).
+
+    Поддерживает:
+    - .zip (включая вложенные zip-в-zip, 1 уровень)
+    - Фильтрацию по расширению (только полезные файлы)
+    - Защиту от zip-бомб (макс 100 файлов, макс 500 MB)
+    """
+    result_files = []
+
+    for fpath in file_paths:
+        ext = os.path.splitext(fpath)[1].lower()
+
+        if ext in ARCHIVE_EXTENSIONS:
+            extracted = _extract_zip(fpath, extract_dir)
+            if extracted:
+                result_files.extend(extracted)
+                logger.info(
+                    f"📦 Распакован {os.path.basename(fpath)}: "
+                    f"{len(extracted)} файлов"
+                )
+            else:
+                # Не удалось распаковать — оставляем архив как есть
+                result_files.append(fpath)
+                logger.warning(
+                    f"⚠️ Не удалось распаковать: {os.path.basename(fpath)}"
+                )
+        else:
+            result_files.append(fpath)
+
+    return result_files
+
+
+def _extract_zip(
+    zip_path: str,
+    extract_dir: str,
+    max_files: int = 100,
+    max_total_bytes: int = 500 * 1024 * 1024,
+) -> list[str]:
+    """
+    Распаковать ZIP-архив во временную папку.
+
+    Защита:
+    - Максимум max_files файлов из одного архива
+    - Максимум max_total_bytes суммарно
+    - Игнорирует path traversal (файлы с ../)
+    - Игнорирует скрытые файлы (._*, __MACOSX, ~$*)
+    - Вложенные zip тоже распаковываются (1 уровень)
+    """
+    try:
+        if not zipfile.is_zipfile(zip_path):
+            logger.warning(f"Не является валидным ZIP: {zip_path}")
+            return []
+
+        extracted_files = []
+        zip_basename = os.path.splitext(os.path.basename(zip_path))[0]
+        out_dir = os.path.join(extract_dir, f"_unzipped_{zip_basename}")
+        os.makedirs(out_dir, exist_ok=True)
+
+        total_extracted_bytes = 0
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            members = zf.infolist()
+
+            # Защита от zip-бомб
+            if len(members) > max_files:
+                logger.warning(
+                    f"ZIP содержит {len(members)} файлов "
+                    f"(>макс {max_files}), ограничиваем"
+                )
+                members = members[:max_files]
+
+            for member in members:
+                if member.is_dir():
+                    continue
+
+                filename = member.filename
+
+                # Защита от path traversal
+                if ".." in filename or filename.startswith("/"):
+                    continue
+
+                # Пропускаем скрытые и системные
+                basename = os.path.basename(filename)
+                if (
+                    basename.startswith("._")
+                    or basename.startswith("~$")
+                    or "__MACOSX" in filename
+                ):
+                    continue
+
+                # Проверяем расширение
+                ext = os.path.splitext(basename)[1].lower()
+                if ext not in SUPPORTED_EXTENSIONS:
+                    continue
+
+                # Проверяем лимит размера
+                if total_extracted_bytes + member.file_size > max_total_bytes:
+                    logger.warning(
+                        f"Превышен лимит размера "
+                        f"({max_total_bytes // 1024 // 1024} MB)"
+                    )
+                    break
+
+                # Извлекаем файл (плоская структура — все в одну папку)
+                out_path = os.path.join(out_dir, basename)
+
+                # Если файл с таким именем уже есть — добавляем суффикс
+                counter = 1
+                while os.path.exists(out_path):
+                    name_no_ext = os.path.splitext(basename)[0]
+                    out_path = os.path.join(
+                        out_dir, f"{name_no_ext}_{counter}{ext}"
+                    )
+                    counter += 1
+
+                with zf.open(member) as src, open(out_path, "wb") as dst:
+                    dst.write(src.read())
+
+                total_extracted_bytes += member.file_size
+                extracted_files.append(out_path)
+
+        # Рекурсия: вложенные zip (один уровень)
+        nested_zips = [f for f in extracted_files if f.endswith(".zip")]
+        for nested_zip in nested_zips:
+            extracted_files.remove(nested_zip)
+            nested_extracted = _extract_zip(
+                nested_zip, out_dir,
+                max_files=50,
+                max_total_bytes=max_total_bytes,
+            )
+            extracted_files.extend(nested_extracted)
+
+        return extracted_files
+
+    except zipfile.BadZipFile:
+        logger.error(f"Повреждённый ZIP: {zip_path}")
+        return []
+    except Exception as e:
+        logger.error(f"Ошибка распаковки {zip_path}: {e}")
+        return []
+
+
+# ═════════════════════════════════════════════════════════════════
 # ОСНОВНАЯ ФУНКЦИЯ (CRON)
 # ═══════════════════════════════════════════════════════════════════
 
@@ -426,6 +580,9 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
 
                 if client.download_file(file_info["path"], local_path):
                     downloaded_files.append(local_path)
+
+            # Распаковка ZIP-архивов
+            downloaded_files = extract_archives(downloaded_files, tmp_dir)
 
             if not downloaded_files:
                 update_tender_status(conn, folder_path, status="error", error="No files downloaded")
