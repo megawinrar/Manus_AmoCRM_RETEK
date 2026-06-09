@@ -852,7 +852,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
     
     Логика:
     1. Поле не найдено (None) → OCR вокруг ключевого слова
-    2. Поле найдено, но значение сомнительно (confidence < 0.7) → OCR-верификация
+    2. Поле найдено, но значение сомнительно (confidence < 0.85) → OCR-верификация
     3. OCR не помог → warning + пометка "требует ручной проверки"
     
     Добавляет в parsed:
@@ -1016,7 +1016,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
                 )
         
         # Если confidence низкая — OCR-верификация
-        if confidence < 0.7 and pdf_files:
+        if confidence < 0.85 and pdf_files:
             for kw in config["ocr_keywords"]:
                 for pdf_path in pdf_files:
                     ocr_text = ocr_region_around_keyword(pdf_path, kw, margin_px=250)
@@ -1041,7 +1041,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
     # Итоговый статус
     if missing_critical:
         parsed["validation_status"] = "blocked"
-    elif any(c < 0.7 for c in confidence_scores.values()):
+    elif any(c < 0.85 for c in confidence_scores.values()):
         parsed["validation_status"] = "warnings"
     else:
         parsed["validation_status"] = "ok"
