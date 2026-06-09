@@ -158,7 +158,7 @@ STATUS_TASK_RULES = {
         "text": "Рассчитать себестоимость, подготовить КП. Проверить наличие у поставщиков",
         "responsible": "EMPLOYEE_3_BUYER",
         "deadline_seconds": 2 * 24 * 3600,  # 2 дня
-        "task_type_id": 3,
+        "task_type_id": 1,
     },
     # → 7. КП передано дилеру: задача Сотруднику 2 «Получить решение дилера» (3 дня)
     "KP_SENT_DEALER": {
@@ -179,10 +179,9 @@ STATUS_TASK_RULES = {
         "text": "Заполнить причину закрытия и архивное назначение. Указать дату возврата если нужно",
         "responsible": "_LEAD_RESPONSIBLE",  # Специальное значение: ответственный за сделку
         "deadline_seconds": 4 * 3600,  # 4 часа
-        "task_type_id": 3,
+                "task_type_id": 1,
     },
 }
-
 # Маппинг имён статусов → status_id (заполняется из ActiveStatuses)
 def get_status_task_rules() -> dict:
     """Получить правила с реальными status_id."""
@@ -596,3 +595,107 @@ PRIORITY_CONTROL = ["Р1", "Р2"]
 # Максимальное время без задачи для Р1/Р2 (в секундах)
 MAX_NO_TASK_P1 = 2 * 3600   # 2 часа
 MAX_NO_TASK_P2 = 4 * 3600   # 4 часа
+
+
+# ═══════════════════════════════════════════════════════════════════
+# АВТОЭСКАЛАЦИЯ ПРИОРИТЕТА ПО ДЕДЛАЙНУ
+# ═══════════════════════════════════════════════════════════════════
+# Если дедлайн подачи ≤ N часов — автоматически повышаем приоритет.
+# Правило: дедлайн ≤ 48ч → Р1, дедлайн ≤ 5 дней → минимум Р2.
+
+ESCALATION_THRESHOLD_P1_HOURS = 48    # ≤ 48 часов до дедлайна → Р1
+ESCALATION_THRESHOLD_P2_HOURS = 120   # ≤ 5 дней до дедлайна → минимум Р2
+
+# Enum IDs приоритетов (для API)
+PRIORITY_ENUM_IDS = {
+    "Р1": 215673,
+    "Р2": 215675,
+    "Р3": 215677,
+    "Р4": 215679,
+}
+
+# Обратный маппинг
+PRIORITY_ENUM_TO_NAME = {v: k for k, v in PRIORITY_ENUM_IDS.items()}
+
+# Порядок приоритетов (меньше = срочнее)
+PRIORITY_ORDER = {"Р1": 1, "Р2": 2, "Р3": 3, "Р4": 4}
+
+
+def auto_escalate_priority(
+    current_priority: str,
+    deadline_str: str,
+    today_str: str = None,
+) -> tuple:
+    """
+    Автоэскалация приоритета на основе близости дедлайна.
+
+    Args:
+        current_priority: Текущий приоритет ("Р1", "Р2", "Р3", "Р4")
+        deadline_str: Дата дедлайна в формате "YYYY-MM-DD" или "DD.MM.YYYY"
+        today_str: Текущая дата (для тестов), по умолчанию — сегодня
+
+    Returns:
+        (new_priority, escalated: bool, reason: str)
+        Если приоритет повышен — escalated=True + причина.
+    """
+    from datetime import datetime, date
+
+    if not deadline_str:
+        return current_priority, False, ""
+
+    # Парсим дедлайн
+    try:
+        if "-" in deadline_str:
+            deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+        elif "." in deadline_str:
+            deadline = datetime.strptime(deadline_str, "%d.%m.%Y").date()
+        else:
+            return current_priority, False, ""
+    except ValueError:
+        return current_priority, False, ""
+
+    # Текущая дата
+    if today_str:
+        today = datetime.strptime(today_str, "%Y-%m-%d").date()
+    else:
+        today = date.today()
+
+    # Считаем часы до дедлайна
+    delta = deadline - today
+    hours_left = delta.days * 24 + (0 if delta.days >= 0 else 0)
+
+    if delta.days < 0:
+        # Дедлайн уже прошёл — максимальная срочность
+        hours_left = 0
+
+    # Определяем целевой приоритет по дедлайну
+    if hours_left <= ESCALATION_THRESHOLD_P1_HOURS:
+        target_priority = "Р1"
+        reason = f"дедлайн через {hours_left}ч ({deadline_str}) — автоэскалация до Р1"
+    elif hours_left <= ESCALATION_THRESHOLD_P2_HOURS:
+        target_priority = "Р2"
+        reason = f"дедлайн через {delta.days} дн. ({deadline_str}) — минимум Р2"
+    else:
+        return current_priority, False, ""
+
+    # Повышаем только если текущий приоритет ниже целевого
+    current_order = PRIORITY_ORDER.get(current_priority, 4)
+    target_order = PRIORITY_ORDER.get(target_priority, 4)
+
+    if target_order < current_order:
+        return target_priority, True, reason
+    else:
+        return current_priority, False, ""
+
+
+# Шаблон заметки при эскалации приоритета
+ESCALATION_NOTE_TEMPLATE = (
+    "🔴 СРОЧНО — АВТОЭСКАЛАЦИЯ ПРИОРИТЕТА\n"
+    "═══════════════════════════════════════\n"
+    "Приоритет повышен: {old_priority} → {new_priority}\n"
+    "Причина: {reason}\n"
+    "───────────────────────────────────────\n"
+    "⏰ Дедлайн подачи: {deadline}\n"
+    "📌 Требуется немедленная реакция!\n"
+    "➡️ Задача создана с дедлайном 2 часа."
+)

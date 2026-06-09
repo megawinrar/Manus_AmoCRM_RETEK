@@ -5,6 +5,7 @@
 1. Контроль Р1/Р2 — если нет активной задачи или задача просрочена → уведомление руководителю
 2. Поиск сделок без «Следующего действия» → задача ответственному
 3. Контроль просроченных задач → уведомление
+4. Автоэскалация приоритета по дедлайну (≤ 48ч → Р1)
 """
 
 import logging
@@ -20,6 +21,12 @@ from .config import (
     PRIORITY_CONTROL,
     MAX_NO_TASK_P1,
     MAX_NO_TASK_P2,
+    PRIORITY_ENUM_IDS,
+    PRIORITY_ENUM_TO_NAME,
+    PRIORITY_LABELS,
+    auto_escalate_priority,
+    build_lead_name,
+    ESCALATION_NOTE_TEMPLATE,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +42,7 @@ class HourlyControl:
             "checked": 0,
             "overdue_found": 0,
             "no_next_action": 0,
+            "escalated": 0,
             "tasks_created": 0,
             "errors": 0,
         }
@@ -46,6 +54,7 @@ class HourlyControl:
         logger.info("=" * 60)
 
         try:
+            self._escalate_by_deadline()
             self._control_priority_leads()
             self._control_no_next_action()
             self._control_overdue_tasks()
@@ -55,6 +64,126 @@ class HourlyControl:
 
         logger.info(f"[HOURLY] Завершено. Статистика: {self.stats}")
         return self.stats
+
+    # ─── 0. Автоэскалация приоритета по дедлайну ─────────────────
+
+    def _escalate_by_deadline(self):
+        """
+        Проверить все сделки в активной воронке:
+        если дедлайн ≤ 48ч и приоритет ниже Р1 → повысить до Р1.
+        Если дедлайн ≤ 5 дней и приоритет ниже Р2 → повысить до Р2.
+        При эскалации: PATCH приоритет + переименовать + красная заметка + задача 2ч.
+        """
+        logger.info("[HOURLY] Автоэскалация по дедлайну...")
+
+        active_statuses = [
+            ActiveStatuses.LLM_RECOGNIZED,
+            ActiveStatuses.CHECK_EMPLOYEE2,
+            ActiveStatuses.SOZ_CALL,
+            ActiveStatuses.SOZ_WAIT,
+            ActiveStatuses.PURCHASING,
+            ActiveStatuses.KP_PREPARING,
+            ActiveStatuses.KP_SENT_DEALER,
+            ActiveStatuses.DEALER_DECISION,
+            ActiveStatuses.BIDDING,
+        ]
+
+        for status_id in active_statuses:
+            if not status_id:
+                continue
+
+            leads = self.client.get_leads(
+                pipeline_id=PIPELINE_ACTIVE,
+                status_id=status_id,
+            )
+
+            for lead in leads:
+                result = self._try_escalate_lead(lead)
+                if result:
+                    self.stats["escalated"] += 1
+
+        if self.stats["escalated"]:
+            logger.info(f"[HOURLY] Эскалировано сделок: {self.stats['escalated']}")
+        else:
+            logger.info("[HOURLY] Эскалация не требуется")
+
+    def _try_escalate_lead(self, lead: dict) -> bool:
+        """
+        Попытаться эскалировать приоритет одной сделки.
+        Returns True если эскалация произошла.
+        """
+        lead_id = lead["id"]
+
+        # Получаем текущий приоритет (текстовое значение)
+        priority_value = AmoClient.get_custom_field_value(lead, Fields.PRIORITY)
+        if not priority_value:
+            return False
+
+        # Получаем дедлайн (поле "Срок подачи")
+        deadline_value = AmoClient.get_custom_field_value(lead, Fields.DEADLINE)
+        if not deadline_value:
+            return False
+
+        # Проверяем эскалацию
+        new_priority, escalated, reason = auto_escalate_priority(
+            current_priority=priority_value,
+            deadline_str=deadline_value,
+        )
+
+        if not escalated:
+            return False
+
+        logger.warning(
+            f"[HOURLY] 🔴 ЭСКАЛАЦИЯ: сделка {lead_id} "
+            f"{priority_value} → {new_priority} | {reason}"
+        )
+
+        if self.dry_run:
+            logger.info(f"[HOURLY] DRY-RUN: пропускаем PATCH для {lead_id}")
+            return True
+
+        # 1. PATCH приоритет
+        new_enum_id = PRIORITY_ENUM_IDS.get(new_priority)
+        self.client.update_lead(lead_id, {
+            "custom_fields_values": [
+                {"field_id": Fields.PRIORITY, "values": [{"enum_id": new_enum_id}]}
+            ]
+        })
+
+        # 2. Переименовать карточку
+        customer = AmoClient.get_custom_field_value(lead, Fields.CUSTOMER) or ""
+        new_name = build_lead_name(
+            priority_enum_id=new_enum_id,
+            customer=customer,
+            deadline_str=deadline_value,
+        )
+        self.client.update_lead(lead_id, {"name": new_name})
+
+        # 3. Красная заметка в ленту
+        note_text = ESCALATION_NOTE_TEMPLATE.format(
+            old_priority=priority_value,
+            new_priority=new_priority,
+            reason=reason,
+            deadline=deadline_value,
+        )
+        self.client.add_note(lead_id, note_text)
+
+        # 4. Задача на 2 часа
+        responsible = lead.get("responsible_user_id", Users.EMPLOYEE_3_PURCHASE)
+        self.client.create_task(
+            lead_id=lead_id,
+            text=(
+                f"🔴 СРОЧНО! Приоритет повышен до {new_priority}.\n"
+                f"Причина: {reason}\n"
+                f"Требуется немедленная реакция!"
+            ),
+            responsible_user_id=responsible,
+            deadline_seconds=2 * 3600,  # 2 часа
+            task_type_id=3,
+        )
+
+        self.stats["tasks_created"] += 1
+        return True
 
     # ─── 1. Контроль Р1/Р2 ───────────────────────────────────────
 

@@ -1,5 +1,5 @@
 """
-Эмуляция LLM-классификатора с полной дедупликацией и обогащением.
+Эмуляция LLM-классификатора с полной дедупликацией, обогащением и post-create хуком.
 
 Порядок работы:
 1. Хешируем файлы тендера
@@ -8,9 +8,16 @@
 4. Если ТОЧНЫЙ дубль → СТОП (ничего не делаем)
 5. Если ОБОГАЩЕНИЕ → обновляем существующую карточку (поля + заметка)
 6. Если FUZZY дубль → создаём, но предупреждаем
-7. Если НОВЫЙ → создаём сделку + задачу + заметку
+7. Если НОВЫЙ → создаём сделку + post_create_hook
 8. Записываем/обновляем в SQLite
 9. Сохраняем снимок (бэкап) при обогащении
+
+POST-CREATE ХУК (вызывается после создания/обогащения):
+- Автоэскалация приоритета по дедлайну (≤48ч → Р1, ≤5 дней → Р2)
+- Переименование карточки по формату: "🔴 СРОЧНО — Заказчик — 10.06"
+- Статусная заметка-инструкция (STATUS_NOTE_TEMPLATES)
+- Красная заметка при эскалации (ESCALATION_NOTE_TEMPLATE)
+- Задача с правильным дедлайном (Р1 → 2ч, Р2 → 2 дня)
 
 Использование:
     python scripts/emulate_llm_with_dedup.py \\
@@ -35,7 +42,7 @@ import os
 import sys
 import time
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 # Добавляем корень проекта в path
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), '..')
@@ -48,6 +55,15 @@ from src.microservice.deduplication import (
     DeduplicationDB, TenderDeduplicator, FileRecord, compute_file_hash
 )
 from src.microservice.cron_backup import save_lead_snapshot
+from src.microservice.config import (
+    auto_escalate_priority,
+    build_lead_name,
+    PRIORITY_ENUM_IDS,
+    PRIORITY_LABELS,
+    ESCALATION_NOTE_TEMPLATE,
+    STATUS_NOTE_TEMPLATES,
+    STATUS_TASK_RULES,
+)
 
 # ═══════════════════════════════════════════════════════════════
 # КОНФИГУРАЦИЯ
@@ -127,6 +143,14 @@ ENUM_SOURCE = {
     "Другое": 215653,
 }
 
+# Маппинг status_id → ключ STATUS_NOTE_TEMPLATES
+STATUS_ID_TO_KEY = {
+    STATUS_5_PURCHASING: "PURCHASING",
+    STATUS_3_SOZ_CALL: "SOZ_CALL",
+    STATUS_2_CHECK: "CHECK_EMPLOYEE2",
+    STATUS_11_ARCHIVE: "TO_ARCHIVE",
+}
+
 
 # ═══════════════════════════════════════════════════════════════
 # МАРШРУТИЗАЦИЯ
@@ -141,6 +165,7 @@ def resolve_routing(priority: str, situation: str) -> dict:
             "status_id": STATUS_11_ARCHIVE,
             "responsible_user_id": USER_EMPLOYEE_2,
             "status_name": "11. К архивированию",
+            "status_key": "TO_ARCHIVE",
         }
 
     if situation == "СОЗ":
@@ -148,6 +173,7 @@ def resolve_routing(priority: str, situation: str) -> dict:
             "status_id": STATUS_3_SOZ_CALL,
             "responsible_user_id": USER_EMPLOYEE_2,
             "status_name": "3. СОЗ — звонок / уточнить дату",
+            "status_key": "SOZ_CALL",
         }
 
     if situation == "Запрос котировок / реальные торги":
@@ -155,6 +181,7 @@ def resolve_routing(priority: str, situation: str) -> dict:
             "status_id": STATUS_5_PURCHASING,
             "responsible_user_id": USER_EMPLOYEE_3,
             "status_name": "5. Передано в закупку / расчёт",
+            "status_key": "PURCHASING",
         }
 
     # Неясно
@@ -162,7 +189,210 @@ def resolve_routing(priority: str, situation: str) -> dict:
         "status_id": STATUS_2_CHECK,
         "responsible_user_id": USER_EMPLOYEE_2,
         "status_name": "2. Проверка Сотрудника 2",
+        "status_key": "CHECK_EMPLOYEE2",
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# POST-CREATE ХУК
+# ═══════════════════════════════════════════════════════════════
+
+def post_create_hook(lead_id: int, args, routing: dict) -> dict:
+    """
+    Вызывается ПОСЛЕ создания или обогащения сделки.
+    
+    Выполняет:
+    1. Автоэскалация приоритета по дедлайну
+    2. Переименование карточки (build_lead_name)
+    3. Статусная заметка-инструкция (STATUS_NOTE_TEMPLATES)
+    4. Красная заметка при эскалации (ESCALATION_NOTE_TEMPLATE)
+    5. Задача с правильным дедлайном (Р1 → 2ч, Р2 → 2 дня)
+    
+    Returns:
+        dict с результатами: final_priority, escalated, lead_name, etc.
+    """
+    print()
+    print("─" * 60)
+    print("[POST-CREATE ХУК] Автоматизация после создания...")
+    print()
+
+    result = {
+        "escalated": False,
+        "final_priority": args.priority,
+        "lead_name": "",
+        "status_note_added": False,
+        "task_created": False,
+    }
+
+    # ─── 1. Автоэскалация приоритета ───
+    print("  [1/5] Проверка автоэскалации приоритета...")
+    
+    # Нормализуем приоритет к формату "Р1"/"Р2"/...
+    current_priority = args.priority.replace("P", "Р")
+    
+    new_priority, escalated, reason = auto_escalate_priority(
+        current_priority=current_priority,
+        deadline_str=args.deadline,
+    )
+    
+    if escalated:
+        print(f"  ⚡ ЭСКАЛАЦИЯ: {current_priority} → {new_priority}")
+        print(f"     Причина: {reason}")
+        result["escalated"] = True
+        result["final_priority"] = new_priority
+        result["escalation_reason"] = reason
+        
+        # Обновляем приоритет в amoCRM
+        priority_enum_id = PRIORITY_ENUM_IDS[new_priority]
+        patch_payload = [{
+            "id": lead_id,
+            "custom_fields_values": [
+                {"field_id": FIELD_PRIORITY, "values": [{"enum_id": priority_enum_id}]}
+            ]
+        }]
+        resp = requests.patch(f"{BASE_URL}/leads", json=patch_payload, headers=HEADERS)
+        if resp.status_code in (200, 201):
+            print(f"  ✓ Приоритет обновлён в amoCRM: {new_priority} (enum_id={priority_enum_id})")
+        else:
+            print(f"  ✗ ОШИБКА обновления приоритета: {resp.status_code} {resp.text}")
+        time.sleep(0.5)
+    else:
+        print(f"  ✓ Эскалация не требуется (приоритет {current_priority} актуален)")
+    
+    final_priority = new_priority if escalated else current_priority
+    final_priority_enum_id = PRIORITY_ENUM_IDS.get(final_priority, 215679)
+
+    # ─── 2. Переименование карточки ───
+    print()
+    print("  [2/5] Переименование карточки (канбан-формат)...")
+    
+    # Формируем дату для названия
+    deadline_display = ""
+    if args.deadline:
+        try:
+            if "-" in args.deadline:
+                dt = datetime.strptime(args.deadline, "%Y-%m-%d")
+            else:
+                dt = datetime.strptime(args.deadline, "%d.%m.%Y")
+            deadline_display = dt.strftime("%d.%m")
+        except ValueError:
+            deadline_display = args.deadline
+    
+    # Сокращаем заказчика
+    customer_clean = args.customer
+    for prefix in ["АО", "ООО", "ПАО", "ФГУП", "ГК"]:
+        customer_clean = customer_clean.replace(prefix, "")
+    customer_clean = customer_clean.replace("«", "").replace("»", "").replace('"', '').strip()
+    
+    lead_name = build_lead_name(
+        priority_enum_id=final_priority_enum_id,
+        customer=customer_clean,
+        deadline_str=deadline_display,
+    )
+    result["lead_name"] = lead_name
+    
+    # PATCH название
+    patch_payload = [{"id": lead_id, "name": lead_name}]
+    resp = requests.patch(f"{BASE_URL}/leads", json=patch_payload, headers=HEADERS)
+    if resp.status_code in (200, 201):
+        print(f"  ✓ Название: \"{lead_name}\"")
+    else:
+        print(f"  ✗ ОШИБКА переименования: {resp.status_code} {resp.text}")
+    time.sleep(0.5)
+
+    # ─── 3. Статусная заметка-инструкция ───
+    print()
+    print("  [3/5] Статусная заметка-инструкция...")
+    
+    status_key = routing.get("status_key", "")
+    status_note_text = STATUS_NOTE_TEMPLATES.get(status_key, "")
+    
+    if status_note_text:
+        payload = [{"note_type": "common", "params": {"text": status_note_text}, "entity_id": lead_id}]
+        resp = requests.post(f"{BASE_URL}/leads/{lead_id}/notes", json=payload, headers=HEADERS)
+        if resp.status_code in (200, 201):
+            # Показываем первые 44 символа (канбан-превью)
+            preview = status_note_text[:44]
+            print(f"  ✓ Заметка добавлена")
+            print(f"    Канбан-превью: \"{preview}\"")
+            result["status_note_added"] = True
+        else:
+            print(f"  ✗ ОШИБКА: {resp.status_code} {resp.text}")
+    else:
+        print(f"  ⚠ Нет шаблона для статуса '{status_key}'")
+    time.sleep(0.5)
+
+    # ─── 4. Красная заметка при эскалации ───
+    print()
+    print("  [4/5] Красная заметка (эскалация)...")
+    
+    if escalated:
+        escalation_note = ESCALATION_NOTE_TEMPLATE.format(
+            old_priority=current_priority,
+            new_priority=new_priority,
+            reason=reason,
+            deadline=args.deadline,
+        )
+        payload = [{"note_type": "common", "params": {"text": escalation_note}, "entity_id": lead_id}]
+        resp = requests.post(f"{BASE_URL}/leads/{lead_id}/notes", json=payload, headers=HEADERS)
+        if resp.status_code in (200, 201):
+            print(f"  ✓ 🔴 Красная заметка добавлена: АВТОЭСКАЛАЦИЯ {current_priority} → {new_priority}")
+        else:
+            print(f"  ✗ ОШИБКА: {resp.status_code} {resp.text}")
+        time.sleep(0.5)
+    else:
+        print(f"  — Эскалации нет, красная заметка не нужна")
+
+    # ─── 5. Задача с правильным дедлайном ───
+    print()
+    print("  [5/5] Создание задачи...")
+    
+    # Определяем текст и дедлайн задачи по статусу
+    task_rule = STATUS_TASK_RULES.get(status_key)
+    if task_rule:
+        task_text = task_rule["text"]
+        
+        # Для Р1 — дедлайн 2 часа вне зависимости от правила
+        if final_priority == "Р1":
+            task_deadline_seconds = 2 * 3600  # 2 часа
+            task_text = f"🔴 СРОЧНО! {task_text}\n\n⏰ Дедлайн подачи: {args.deadline}"
+        else:
+            task_deadline_seconds = task_rule["deadline_seconds"]
+        
+        task_deadline_ts = int((datetime.now() + timedelta(seconds=task_deadline_seconds)).timestamp())
+        
+        task_payload = [{
+            "text": task_text,
+            "complete_till": task_deadline_ts,
+            "responsible_user_id": routing["responsible_user_id"],
+            "entity_id": lead_id,
+            "entity_type": "leads",
+            "task_type_id": task_rule.get("task_type_id", 1),
+        }]
+        resp = requests.post(f"{BASE_URL}/tasks", json=task_payload, headers=HEADERS)
+        if resp.status_code in (200, 201):
+            task_id = resp.json()["_embedded"]["tasks"][0]["id"]
+            hours = task_deadline_seconds / 3600
+            print(f"  ✓ Задача ID={task_id} (дедлайн: {hours:.0f}ч)")
+            print(f"    Текст: {task_text[:60]}...")
+            result["task_created"] = True
+            result["task_id"] = task_id
+        else:
+            print(f"  ✗ ОШИБКА: {resp.status_code} {resp.text}")
+    else:
+        print(f"  ⚠ Нет правила задачи для статуса '{status_key}'")
+    
+    print()
+    print("─" * 60)
+    print(f"[POST-CREATE ХУК] Завершён.")
+    if escalated:
+        print(f"  🔴 ПРИОРИТЕТ ПОВЫШЕН: {current_priority} → {new_priority}")
+    print(f"  📋 Название: \"{lead_name}\"")
+    print(f"  📝 Статусная заметка: {'✓' if result['status_note_added'] else '✗'}")
+    print(f"  📌 Задача: {'✓' if result['task_created'] else '✗'}")
+    print("─" * 60)
+    
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -242,8 +472,7 @@ def enrich_existing_lead(
     Логика:
     - Сохраняем снимок "до"
     - Обновляем поля (если новая информация точнее)
-    - Добавляем заметку об обогащении
-    - Обновляем/создаём задачу если нужно
+    - Вызываем post_create_hook (эскалация + переименование + заметка + задача)
     - Сохраняем снимок "после"
     
     Returns:
@@ -267,8 +496,6 @@ def enrich_existing_lead(
         fields_payload.append({"field_id": FIELD_NMC, "values": [{"value": args.nmc}]})
     if args.situation:
         fields_payload.append({"field_id": FIELD_SITUATION_TYPE, "values": [{"enum_id": ENUM_SITUATION.get(args.situation, 215659)}]})
-    if args.priority:
-        fields_payload.append({"field_id": FIELD_PRIORITY, "values": [{"enum_id": ENUM_PRIORITY.get(args.priority, 215679)}]})
     if args.direction:
         fields_payload.append({"field_id": FIELD_DIRECTION, "values": [{"enum_id": ENUM_DIRECTION.get(args.direction, 215695)}]})
     if args.procedure_number:
@@ -285,16 +512,7 @@ def enrich_existing_lead(
     )
     fields_payload.append({"field_id": FIELD_LLM_COMMENT, "values": [{"value": enrichment_comment}]})
 
-    # Формируем обновлённое название
-    priority_short = args.priority.replace("Р", "P").replace("P", "Р")
-    customer_short = args.customer.replace("АО", "").replace("ООО", "").replace("«", "").replace("»", "").strip()
-    if len(customer_short) > 30:
-        customer_short = customer_short[:30]
-    nmc_mln = args.nmc / 1_000_000
-    deal_name = f"{priority_short} / {customer_short} / {args.positions} поз. / {nmc_mln:.1f} млн"
-
     # Дедлайн
-    deadline_ts = None
     if args.deadline:
         try:
             deadline_dt = datetime.strptime(args.deadline, "%Y-%m-%d")
@@ -303,11 +521,10 @@ def enrich_existing_lead(
         except ValueError:
             pass
 
-    # PATCH запрос
+    # PATCH запрос (поля + статус)
     patch_payload = [
         {
             "id": lead_id,
-            "name": deal_name,
             "pipeline_id": PIPELINE_ID,
             "status_id": routing["status_id"],
             "responsible_user_id": routing["responsible_user_id"],
@@ -318,9 +535,7 @@ def enrich_existing_lead(
 
     resp = requests.patch(f"{BASE_URL}/leads", json=patch_payload, headers=HEADERS)
     if resp.status_code in (200, 201):
-        print(f"  [PATCH] Сделка обновлена ✓")
-        print(f"    Новое название: {deal_name}")
-        print(f"    Статус: {routing['status_name']}")
+        print(f"  [PATCH] Поля обновлены ✓")
     else:
         print(f"  [PATCH] ОШИБКА: {resp.status_code} {resp.text}")
         return False
@@ -365,40 +580,12 @@ def enrich_existing_lead(
 
     time.sleep(0.5)
 
-    # 4. Обновляем задачу (создаём новую если есть новая информация)
-    if dedup_result.new_files or dedup_result.updated_files:
-        print(f"  [TASK] Создаю задачу на пересмотр...")
-        task_text = (
-            f"ОБОГАЩЕНИЕ: пересмотреть расчёт.\n\n"
-            f"Карточка обогащена новыми данными:\n"
-            f"- Новые файлы: {len(dedup_result.new_files)}\n"
-            f"- Обновлённые файлы: {len(dedup_result.updated_files)}\n\n"
-            f"Заказчик: {args.customer}\n"
-            f"НМЦ: {args.nmc:,.2f} руб.\n"
-            f"Позиций: {args.positions}\n"
-            f"Срок подачи: {args.deadline}"
-        )
-        deadline = int((datetime.now() + timedelta(days=1)).timestamp())
-        task_payload = [
-            {
-                "text": task_text,
-                "complete_till": deadline,
-                "responsible_user_id": routing["responsible_user_id"],
-                "entity_id": lead_id,
-                "entity_type": "leads",
-                "task_type_id": 1,
-            }
-        ]
-        resp = requests.post(f"{BASE_URL}/tasks", json=task_payload, headers=HEADERS)
-        if resp.status_code in (200, 201):
-            task_id = resp.json()["_embedded"]["tasks"][0]["id"]
-            print(f"  [TASK] Задача создана: ID={task_id} ✓")
-        else:
-            print(f"  [TASK] ОШИБКА: {resp.status_code} {resp.text}")
+    # 4. POST-CREATE ХУК (эскалация + переименование + статусная заметка + задача)
+    hook_result = post_create_hook(lead_id, args, routing)
 
     # 5. Сохраняем снимок "после"
     time.sleep(0.5)
-    print(f"  [SNAPSHOT] Сохраняю состояние 'после'...")
+    print(f"\n  [SNAPSHOT] Сохраняю состояние 'после'...")
     save_lead_snapshot(lead_id, "after_enrichment")
 
     return True
@@ -426,34 +613,11 @@ def create_lead(deal_name: str, routing: dict, fields_payload: list, price: int)
         data = resp.json()
         lead_id = data["_embedded"]["leads"][0]["id"]
         print(f"  [CREATE LEAD] Сделка создана: ID={lead_id}")
-        print(f"    Название: {deal_name}")
+        print(f"    Временное название: {deal_name}")
         print(f"    Статус: {routing['status_name']}")
         return lead_id
     else:
         print(f"  [CREATE LEAD] ОШИБКА: {resp.status_code} {resp.text}")
-        return None
-
-
-def create_task(lead_id: int, text: str, responsible_user_id: int, days: int = 2) -> int:
-    """Создать задачу для сделки."""
-    deadline = int((datetime.now() + timedelta(days=days)).timestamp())
-    payload = [
-        {
-            "text": text,
-            "complete_till": deadline,
-            "responsible_user_id": responsible_user_id,
-            "entity_id": lead_id,
-            "entity_type": "leads",
-            "task_type_id": 1,
-        }
-    ]
-    resp = requests.post(f"{BASE_URL}/tasks", json=payload, headers=HEADERS)
-    if resp.status_code in (200, 201):
-        task_id = resp.json()["_embedded"]["tasks"][0]["id"]
-        print(f"  [CREATE TASK] Задача создана: ID={task_id}")
-        return task_id
-    else:
-        print(f"  [CREATE TASK] ОШИБКА: {resp.status_code} {resp.text}")
         return None
 
 
@@ -497,13 +661,14 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print("LLM-КЛАССИФИКАТОР (эмуляция с дедупликацией + обогащением)")
+    print("LLM-КЛАССИФИКАТОР (эмуляция + дедупликация + post-create хук)")
     print("=" * 60)
     print(f"\n  Заказчик: {args.customer}")
     print(f"  НМЦ: {args.nmc:,.2f} руб.")
     print(f"  Приоритет: {args.priority}")
     print(f"  Направление: {args.direction}")
     print(f"  Тип ситуации: {args.situation}")
+    print(f"  Дедлайн: {args.deadline}")
     print(f"  Уверенность: {args.confidence}")
     print(f"  Файлов: {len(args.files)}")
     print()
@@ -639,13 +804,8 @@ def main():
     print(f"  Ответственный: User ID={routing['responsible_user_id']}")
     print()
 
-    # Формируем название
-    priority_short = args.priority.replace("Р", "P").replace("P", "Р")
-    customer_short = args.customer.replace("АО", "").replace("ООО", "").replace("«", "").replace("»", "").strip()
-    if len(customer_short) > 30:
-        customer_short = customer_short[:30]
-    nmc_mln = args.nmc / 1_000_000
-    deal_name = f"{priority_short} / {customer_short} / {args.positions} поз. / {nmc_mln:.1f} млн"
+    # Формируем временное название (будет перезаписано в post_create_hook)
+    deal_name = f"[СОЗДАЁТСЯ] {args.customer[:30]}"
 
     # Дедлайн
     deadline_ts = None
@@ -685,21 +845,7 @@ def main():
 
     time.sleep(1)
 
-    # ─── Шаг 5: Задача ───
-    task_text = (
-        f"Рассчитать себестоимость, подготовить КП.\n\n"
-        f"Заказчик: {args.customer}\n"
-        f"НМЦ: {args.nmc:,.2f} руб.\n"
-        f"Позиций: {args.positions}\n"
-        f"Направление: {args.direction}\n"
-        f"Номер процедуры: {args.procedure_number}\n"
-        f"Срок подачи: {args.deadline}"
-    )
-    create_task(lead_id, task_text, routing["responsible_user_id"])
-
-    time.sleep(1)
-
-    # ─── Шаг 6: Заметка ───
+    # ─── Шаг 5: LLM-заметка (классификация) ───
     file_list = "\n".join([f"- {fr.filename}" for fr in file_records])
     note_text = (
         f"🆕 LLM-классификатор (эмуляция)\n\n"
@@ -710,6 +856,7 @@ def main():
         f"Заказчик: {args.customer}\n"
         f"НМЦ: {args.nmc:,.2f} руб.\n"
         f"Номер процедуры: {args.procedure_number}\n"
+        f"Дедлайн подачи: {args.deadline}\n"
         f"Уверенность: {args.confidence}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"Комментарий: {args.comment}\n\n"
@@ -718,11 +865,15 @@ def main():
         f"🕐 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
     )
     add_note(lead_id, note_text)
+    time.sleep(1)
+
+    # ─── Шаг 6: POST-CREATE ХУК ───
+    hook_result = post_create_hook(lead_id, args, routing)
 
     # ─── Шаг 7: Записываем в SQLite ───
     print()
     print("─" * 60)
-    print("[ШАГ 5] Запись в SQLite (дедупликация)...")
+    print("[ШАГ 7] Запись в SQLite (дедупликация)...")
     db.save_tender(
         tender_path=args.tender_path,
         files=file_records,
@@ -739,8 +890,12 @@ def main():
 
     # ─── Итог ───
     print("=" * 60)
-    print("ГОТОВО! Новая сделка создана.")
+    print("ГОТОВО! Новая сделка создана + post-create хук выполнен.")
     print(f"  Сделка: https://{AMO_DOMAIN}/leads/detail/{lead_id}")
+    print(f"  Название: \"{hook_result.get('lead_name', deal_name)}\"")
+    print(f"  Приоритет: {hook_result.get('final_priority', args.priority)}")
+    if hook_result.get("escalated"):
+        print(f"  🔴 ЭСКАЛАЦИЯ: {args.priority} → {hook_result['final_priority']}")
     print(f"  Статус: {routing['status_name']}")
     print(f"  SQLite: записано")
     print("=" * 60)
