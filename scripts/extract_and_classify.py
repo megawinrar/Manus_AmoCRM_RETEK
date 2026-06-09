@@ -16,6 +16,7 @@ extract_and_classify.py — Быстрая экстракция + парсинг
 
 import argparse
 import json
+import logging
 import os
 import re
 import subprocess
@@ -23,6 +24,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -42,6 +45,130 @@ def extract_pdf(filepath: str) -> str:
         return result.stdout
     except Exception as e:
         return f"[ОШИБКА PDF: {e}]"
+
+
+def is_scanned_pdf(filepath: str, text: str) -> bool:
+    """
+    Определить, является ли PDF сканированным (без текстового слоя).
+    Критерий: < 100 символов на страницу = скорее всего скан/картинка.
+    """
+    try:
+        # Подсчитать страницы через pdfinfo
+        info = subprocess.run(
+            ["pdfinfo", filepath], capture_output=True, text=True, timeout=10
+        )
+        pages = 1
+        for line in info.stdout.splitlines():
+            if line.startswith("Pages:"):
+                pages = int(line.split(":")[1].strip())
+                break
+        chars_per_page = len(text.strip()) / max(pages, 1)
+        return chars_per_page < 100
+    except Exception:
+        # Fallback: если текст почти пустой
+        return len(text.strip()) < 200
+
+
+def ocr_pdf(filepath: str) -> str:
+    """
+    OCR для сканированных PDF: pdf2image → pytesseract.
+    Используется ТОЛЬКО когда pdftotext не дал результата.
+    Время: ~3-5 сек на страницу.
+    """
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+
+        logger.info(f"OCR fallback для: {os.path.basename(filepath)}")
+        images = convert_from_path(filepath, dpi=300)
+        text_parts = []
+        for i, img in enumerate(images):
+            page_text = pytesseract.image_to_string(img, lang='rus+eng')
+            text_parts.append(page_text)
+            logger.debug(f"  OCR стр.{i+1}: {len(page_text)} символов")
+        return "\n\n".join(text_parts)
+    except ImportError:
+        return "[OCR НЕДОСТУПЕН: установите pytesseract и pdf2image]"
+    except Exception as e:
+        return f"[ОШИБКА OCR: {e}]"
+
+
+def ocr_region_around_keyword(filepath: str, keyword: str, margin_px: int = 200) -> str:
+    """
+    Точечный OCR: найти область вокруг ключевого слова и распознать её.
+    Используется для верификации конкретного поля когда confidence низкая.
+    
+    Стратегия:
+    1. Получить координаты слова через pdftotext -bbox
+    2. Вырезать регион (keyword bbox + margin)
+    3. OCR только этого региона
+    
+    Возвращает распознанный текст региона или пустую строку.
+    """
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+        from PIL import Image
+
+        # Получить bbox всех слов
+        result = subprocess.run(
+            ["pdftotext", "-bbox", filepath, "-"],
+            capture_output=True, text=True, timeout=30
+        )
+
+        # Найти координаты ключевого слова
+        keyword_lower = keyword.lower()
+        bbox_match = None
+        page_num = 0
+
+        for line in result.stdout.splitlines():
+            if '<page' in line:
+                page_num += 1
+            if keyword_lower in line.lower() and 'xMin' in line:
+                # Парсим bbox из HTML-подобного формата pdftotext -bbox
+                coords = re.findall(r'[xy](?:Min|Max)="([\d.]+)"', line)
+                if len(coords) >= 4:
+                    bbox_match = {
+                        'page': page_num,
+                        'xMin': float(coords[0]),
+                        'yMin': float(coords[1]),
+                        'xMax': float(coords[2]),
+                        'yMax': float(coords[3]),
+                    }
+                    break
+
+        if not bbox_match:
+            return ""
+
+        # Конвертировать нужную страницу в изображение
+        images = convert_from_path(
+            filepath, dpi=300,
+            first_page=bbox_match['page'],
+            last_page=bbox_match['page']
+        )
+        if not images:
+            return ""
+
+        img = images[0]
+        w, h = img.size
+
+        # Масштабировать координаты (PDF points → pixels at 300dpi)
+        scale = 300 / 72  # PDF uses 72 dpi
+        x1 = max(0, int(bbox_match['xMin'] * scale) - margin_px)
+        y1 = max(0, int(bbox_match['yMin'] * scale) - margin_px)
+        x2 = min(w, int(bbox_match['xMax'] * scale) + margin_px)
+        y2 = min(h, int(bbox_match['yMax'] * scale) + margin_px)
+
+        # Вырезать и OCR
+        region = img.crop((x1, y1, x2, y2))
+        text = pytesseract.image_to_string(region, lang='rus+eng')
+        return text.strip()
+
+    except ImportError:
+        return ""
+    except Exception as e:
+        logger.warning(f"OCR region failed for '{keyword}': {e}")
+        return ""
 
 
 def extract_docx(filepath: str) -> str:
@@ -97,28 +224,42 @@ def extract_doc(filepath: str) -> str:
 
 
 def extract_file(filepath: str) -> tuple:
-    """Извлечь текст из файла. Возвращает (text, time_ms)."""
+    """
+    Извлечь текст из файла. Возвращает (text, time_ms, method).
+    method: 'pdftotext' | 'ocr' | 'python-docx' | 'openpyxl' | 'text' | 'antiword'
+    """
     ext = Path(filepath).suffix.lower()
     t0 = time.time()
+    method = "unknown"
 
     if ext == ".pdf":
         text = extract_pdf(filepath)
+        method = "pdftotext"
+        # Проверка: если PDF сканированный — fallback на OCR
+        if is_scanned_pdf(filepath, text):
+            logger.info(f"PDF сканированный, применяю OCR: {os.path.basename(filepath)}")
+            text = ocr_pdf(filepath)
+            method = "ocr"
     elif ext == ".docx":
         text = extract_docx(filepath)
+        method = "python-docx"
     elif ext == ".xlsx" or ext == ".xls":
         text = extract_xlsx(filepath)
+        method = "openpyxl"
     elif ext == ".doc":
         text = extract_doc(filepath)
+        method = "antiword"
     elif ext in (".txt", ".csv", ".rtf"):
         try:
             text = Path(filepath).read_text(encoding="utf-8", errors="replace")
+            method = "text"
         except Exception as e:
             text = f"[ОШИБКА: {e}]"
     else:
         text = ""
 
     elapsed_ms = (time.time() - t0) * 1000
-    return text, elapsed_ms
+    return text, elapsed_ms, method
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -619,6 +760,189 @@ def build_emulate_command(parsed: dict, files: list, tender_path: str = "") -> s
     return "\n".join(parts)
 
 
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ВАЛИДАЦИЯ + OCR-FALLBACK
+# ═══════════════════════════════════════════════════════════════════
+
+# Обязательные поля и ключевые слова для OCR-верификации
+REQUIRED_FIELDS = {
+    "customer": {
+        "label": "Заказчик",
+        "severity": "block",  # без этого нельзя создать сделку
+        "ocr_keywords": ["Наименование", "Заказчик", "Организатор"],
+    },
+    "nmc": {
+        "label": "НМЦ",
+        "severity": "block",
+        "ocr_keywords": ["НМЦ", "максимальная", "Итого"],
+    },
+    "deadline": {
+        "label": "Дедлайн",
+        "severity": "block",
+        "ocr_keywords": ["подачи", "Окончание", "срок"],
+    },
+    "procedure_number": {
+        "label": "Номер закупки",
+        "severity": "warn",
+        "ocr_keywords": ["Номер", "закупки", "извещения"],
+    },
+    "platform": {
+        "label": "Площадка",
+        "severity": "warn",
+        "ocr_keywords": ["площадка", "ЭТП", "etprf"],
+    },
+}
+
+# Поля, где низкая уверенность требует OCR-проверки
+CONFIDENCE_THRESHOLDS = {
+    "nmc": {"min_value": 100_000, "max_value": 10_000_000_000},
+    "deadline": {"min_year": 2024, "max_year": 2030},
+}
+
+
+def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> dict:
+    """
+    Валидация обязательных полей + OCR-fallback.
+    
+    Логика:
+    1. Поле не найдено (None) → OCR вокруг ключевого слова
+    2. Поле найдено, но значение сомнительно (confidence < 0.7) → OCR-верификация
+    3. OCR не помог → warning + пометка "требует ручной проверки"
+    
+    Добавляет в parsed:
+    - confidence_scores: {field: 0.0-1.0}
+    - ocr_applied: [field_names]
+    - validation_status: 'ok' | 'warnings' | 'blocked'
+    """
+    confidence_scores = {}
+    ocr_applied = []
+    missing_critical = []
+    
+    for field, config in REQUIRED_FIELDS.items():
+        value = parsed.get(field)
+        
+        # === Поле не найдено ===
+        if value is None:
+            confidence_scores[field] = 0.0
+            
+            # Попытка OCR-fallback для PDF
+            if pdf_files:
+                ocr_text = ""
+                for kw in config["ocr_keywords"]:
+                    for pdf_path in pdf_files:
+                        ocr_text = ocr_region_around_keyword(pdf_path, kw, margin_px=250)
+                        if ocr_text and len(ocr_text) > 10:
+                            break
+                    if ocr_text:
+                        break
+                
+                if ocr_text:
+                    # Повторный парсинг на OCR-тексте
+                    ocr_parsed = parse_tender_fields(ocr_text, [])
+                    if ocr_parsed.get(field) is not None:
+                        parsed[field] = ocr_parsed[field]
+                        if field == "customer" and ocr_parsed.get("customer_short"):
+                            parsed["customer_short"] = ocr_parsed["customer_short"]
+                        if field == "nmc" and ocr_parsed.get("nmc_formatted"):
+                            parsed["nmc_formatted"] = ocr_parsed["nmc_formatted"]
+                        confidence_scores[field] = 0.7
+                        ocr_applied.append(field)
+                        parsed["warnings"].append(
+                            f"Поле '{config['label']}' извлечено через OCR (требует проверки)"
+                        )
+                        continue
+            
+            # OCR не помог
+            if config["severity"] == "block":
+                missing_critical.append(config["label"])
+                parsed["warnings"].append(
+                    f"КРИТИЧНО: '{config['label']}' не найдено — требуется ручной ввод"
+                )
+            else:
+                parsed["warnings"].append(
+                    f"Поле '{config['label']}' не найдено (некритично)"
+                )
+            continue
+        
+        # === Поле найдено — проверка адекватности ===
+        confidence = 1.0
+        
+        # Проверка НМЦ
+        if field == "nmc" and field in CONFIDENCE_THRESHOLDS:
+            thresholds = CONFIDENCE_THRESHOLDS[field]
+            nmc_val = parsed["nmc"]
+            if nmc_val < thresholds["min_value"]:
+                confidence = 0.5
+                parsed["warnings"].append(
+                    f"НМЦ подозрительно мала: {nmc_val:,.0f} руб. (< {thresholds['min_value']:,.0f})"
+                )
+            elif nmc_val > thresholds["max_value"]:
+                confidence = 0.4
+                parsed["warnings"].append(
+                    f"НМЦ подозрительно велика: {nmc_val:,.0f} руб. (> {thresholds['max_value']:,.0f})"
+                )
+        
+        # Проверка дедлайна
+        if field == "deadline" and field in CONFIDENCE_THRESHOLDS:
+            thresholds = CONFIDENCE_THRESHOLDS[field]
+            try:
+                year = int(parsed["deadline"][:4])
+                if year < thresholds["min_year"] or year > thresholds["max_year"]:
+                    confidence = 0.3
+                    parsed["warnings"].append(
+                        f"Дедлайн подозрительный: {parsed['deadline']} (год вне диапазона)"
+                    )
+            except (ValueError, IndexError):
+                confidence = 0.5
+        
+        # Проверка заказчика
+        if field == "customer":
+            cust = parsed["customer"]
+            if len(cust) < 10:
+                confidence = 0.5
+            elif not any(kw in cust for kw in ["общество", "АО", "ПАО", "ООО", "ФГУП", "ГК", "ФКП",
+                                                "Общество", "Акционерное", "Федеральное"]):
+                confidence = 0.6
+        
+        # Если confidence низкая — OCR-верификация
+        if confidence < 0.7 and pdf_files:
+            for kw in config["ocr_keywords"]:
+                for pdf_path in pdf_files:
+                    ocr_text = ocr_region_around_keyword(pdf_path, kw, margin_px=250)
+                    if ocr_text and len(ocr_text) > 10:
+                        ocr_parsed = parse_tender_fields(ocr_text, [])
+                        if ocr_parsed.get(field) is not None:
+                            if str(ocr_parsed[field]) != str(parsed[field]):
+                                parsed["warnings"].append(
+                                    f"OCR-верификация '{config['label']}': "
+                                    f"текст='{parsed[field]}' vs OCR='{ocr_parsed[field]}' — РАСХОЖДЕНИЕ"
+                                )
+                                confidence = 0.4
+                            else:
+                                confidence = 0.9  # OCR подтвердил
+                            ocr_applied.append(f"{field}_verify")
+                        break
+                if f"{field}_verify" in ocr_applied:
+                    break
+        
+        confidence_scores[field] = confidence
+    
+    # Итоговый статус
+    if missing_critical:
+        parsed["validation_status"] = "blocked"
+    elif any(c < 0.7 for c in confidence_scores.values()):
+        parsed["validation_status"] = "warnings"
+    else:
+        parsed["validation_status"] = "ok"
+    
+    parsed["confidence_scores"] = confidence_scores
+    parsed["ocr_applied"] = ocr_applied
+    
+    return parsed
+
+
 # ═══════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════
@@ -659,9 +983,10 @@ def main():
     all_text = ""
     extraction_stats = []
     file_names = [os.path.basename(f) for f in files]
+    pdf_files = []  # сохраняем PDF для возможного OCR-fallback
 
     for filepath in files:
-        text, elapsed_ms = extract_file(filepath)
+        text, elapsed_ms, method = extract_file(filepath)
         all_text += f"\n\n{'='*40}\n{os.path.basename(filepath)}\n{'='*40}\n{text}"
         extraction_stats.append({
             "name": os.path.basename(filepath),
@@ -669,7 +994,10 @@ def main():
             "size_kb": os.path.getsize(filepath) / 1024,
             "time_ms": elapsed_ms,
             "chars": len(text),
+            "method": method,
         })
+        if Path(filepath).suffix.lower() == ".pdf":
+            pdf_files.append(filepath)
 
     total_time = time.time() - total_start
 
@@ -678,14 +1006,21 @@ def main():
     parsed = parse_tender_fields(all_text, file_names)
     parse_time = time.time() - t0
 
+    # Валидация + OCR-fallback для ненайденных полей
+    t_val = time.time()
+    parsed = validate_and_ocr_fallback(parsed, pdf_files, all_text)
+    validate_time = time.time() - t_val
+
     # Вывод
     if args.json:
         parsed["_meta"] = {
             "extraction_time_ms": round(total_time * 1000),
             "parse_time_ms": round(parse_time * 1000),
-            "total_time_ms": round((total_time + parse_time) * 1000),
+            "validate_time_ms": round(validate_time * 1000),
+            "total_time_ms": round((total_time + parse_time + validate_time) * 1000),
             "files_count": len(files),
             "total_chars": sum(s["chars"] for s in extraction_stats),
+            "methods": [s["method"] for s in extraction_stats],
         }
         print(json.dumps(parsed, ensure_ascii=False, indent=2))
     else:
