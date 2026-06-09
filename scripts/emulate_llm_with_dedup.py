@@ -60,6 +60,7 @@ from src.microservice.config import (
     build_lead_name,
     PRIORITY_ENUM_IDS,
     PRIORITY_LABELS,
+    PRIORITY_TAG_IDS,
     ESCALATION_NOTE_TEMPLATE,
     STATUS_NOTE_TEMPLATES,
     STATUS_TASK_RULES,
@@ -291,14 +292,20 @@ def post_create_hook(lead_id: int, args, routing: dict) -> dict:
     )
     result["lead_name"] = lead_name
     
-    # PATCH название (используем single-lead endpoint, не массовый)
+    # PATCH название + цветной тег приоритета (в одном PATCH)
+    tag_id = PRIORITY_TAG_IDS.get(final_priority_enum_id)
+    patch_body = {"name": lead_name}
+    if tag_id:
+        patch_body["_embedded"] = {"tags": [{"id": tag_id}]}
+    
     resp = requests.patch(
         f"{BASE_URL}/leads/{lead_id}",
-        json={"name": lead_name},
+        json=patch_body,
         headers=HEADERS,
     )
     if resp.status_code in (200, 201):
-        print(f"  ✓ Название: \"{lead_name}\"")
+        tag_name = f" + тег P{['1','2','3','4'][list(PRIORITY_TAG_IDS.keys()).index(final_priority_enum_id)]}" if tag_id else ""
+        print(f"  ✓ Название: \"{lead_name}\"{tag_name}")
     else:
         print(f"  ✗ ОШИБКА переименования: {resp.status_code} {resp.text}")
     time.sleep(0.5)
@@ -332,6 +339,10 @@ def post_create_hook(lead_id: int, args, routing: dict) -> dict:
     status_note_text = STATUS_NOTE_TEMPLATES.get(status_key, "")
     
     if status_note_text:
+        # Для Р1 — префикс "СРОЧНО!" чтобы на канбане сразу было видно
+        if final_priority == "Р1":
+            status_note_text = f"СРОЧНО! {status_note_text}"
+        
         payload = [{"note_type": "common", "params": {"text": status_note_text}, "entity_id": lead_id}]
         resp = requests.post(f"{BASE_URL}/leads/{lead_id}/notes", json=payload, headers=HEADERS)
         if resp.status_code in (200, 201):
