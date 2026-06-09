@@ -291,18 +291,42 @@ def post_create_hook(lead_id: int, args, routing: dict) -> dict:
     )
     result["lead_name"] = lead_name
     
-    # PATCH название
-    patch_payload = [{"id": lead_id, "name": lead_name}]
-    resp = requests.patch(f"{BASE_URL}/leads", json=patch_payload, headers=HEADERS)
+    # PATCH название (используем single-lead endpoint, не массовый)
+    resp = requests.patch(
+        f"{BASE_URL}/leads/{lead_id}",
+        json={"name": lead_name},
+        headers=HEADERS,
+    )
     if resp.status_code in (200, 201):
         print(f"  ✓ Название: \"{lead_name}\"")
     else:
         print(f"  ✗ ОШИБКА переименования: {resp.status_code} {resp.text}")
     time.sleep(0.5)
 
-    # ─── 3. Статусная заметка-инструкция ───
+    # ─── 3. Красная заметка при эскалации (если есть) ───
     print()
-    print("  [3/5] Статусная заметка-инструкция...")
+    print("  [3/5] Красная заметка (эскалация)...")
+    
+    if escalated:
+        escalation_note = ESCALATION_NOTE_TEMPLATE.format(
+            old_priority=current_priority,
+            new_priority=new_priority,
+            reason=reason,
+            deadline=args.deadline,
+        )
+        payload = [{"note_type": "common", "params": {"text": escalation_note}, "entity_id": lead_id}]
+        resp = requests.post(f"{BASE_URL}/leads/{lead_id}/notes", json=payload, headers=HEADERS)
+        if resp.status_code in (200, 201):
+            print(f"  ✓ 🔴 Красная заметка добавлена: АВТОЭСКАЛАЦИЯ {current_priority} → {new_priority}")
+        else:
+            print(f"  ✗ ОШИБКА: {resp.status_code} {resp.text}")
+        time.sleep(0.5)
+    else:
+        print(f"  — Эскалации нет, красная заметка не нужна")
+
+    # ─── 4. Статусная заметка-инструкция (ПОСЛЕДНЯЯ — видна на канбане) ───
+    print()
+    print("  [4/5] Статусная заметка-инструкция (последняя → канбан-превью)...")
     
     status_key = routing.get("status_key", "")
     status_note_text = STATUS_NOTE_TEMPLATES.get(status_key, "")
@@ -321,27 +345,6 @@ def post_create_hook(lead_id: int, args, routing: dict) -> dict:
     else:
         print(f"  ⚠ Нет шаблона для статуса '{status_key}'")
     time.sleep(0.5)
-
-    # ─── 4. Красная заметка при эскалации ───
-    print()
-    print("  [4/5] Красная заметка (эскалация)...")
-    
-    if escalated:
-        escalation_note = ESCALATION_NOTE_TEMPLATE.format(
-            old_priority=current_priority,
-            new_priority=new_priority,
-            reason=reason,
-            deadline=args.deadline,
-        )
-        payload = [{"note_type": "common", "params": {"text": escalation_note}, "entity_id": lead_id}]
-        resp = requests.post(f"{BASE_URL}/leads/{lead_id}/notes", json=payload, headers=HEADERS)
-        if resp.status_code in (200, 201):
-            print(f"  ✓ 🔴 Красная заметка добавлена: АВТОЭСКАЛАЦИЯ {current_priority} → {new_priority}")
-        else:
-            print(f"  ✗ ОШИБКА: {resp.status_code} {resp.text}")
-        time.sleep(0.5)
-    else:
-        print(f"  — Эскалации нет, красная заметка не нужна")
 
     # ─── 5. Задача с правильным дедлайном ───
     print()
