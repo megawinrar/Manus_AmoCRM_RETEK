@@ -31,6 +31,12 @@
 │  │   Пн 09:00 — зависшие карточки                            │
 │  │   1-е число — ревизия архива                              │
 │  │                                                           │
+│  🔍 Дедупликация + Валидация                                 │
+│  │   хеш-сравнение файлов (SHA-256)                          │
+│  │   fuzzy-match заказчик + НМЦ                              │
+│  │   обогащение карточки при новых файлах                     │
+│  │   валидация обязательных полей по статусам                 │
+│  │                                                           │
 │  💾 Хранилище                                                │
 │  │   SQLite: processed_tenders.db                            │
 │  │   Логи LLM: data/llm_logs/                               │
@@ -52,12 +58,16 @@
 │   ├── cron_daily.py        # Архивация + LLM-назначение
 │   ├── cron_weekly.py       # Зависшие карточки
 │   ├── cron_monthly.py      # Ревизия архива
-│   └── llm_classifier.py   # Яндекс GPT классификатор
+│   ├── llm_classifier.py   # Яндекс GPT классификатор
+│   ├── deduplication.py     # Дедупликация + обогащение тендеров
+│   └── field_validator.py   # Валидация обязательных полей по статусам
 ├── docs/
 │   ├── CONTEXT_FULL.md      # Полный контекст проекта (RAG)
 │   └── amocrm_fields_and_logic.md  # Поля и логика amoCRM
 ├── tests/
-│   └── test_microservice.py # 43 теста
+│   ├── test_microservice.py # 29 тестов (config, webhook, cron)
+│   ├── test_deduplication.py # 35 тестов (дубли, обогащение, fuzzy)
+│   └── test_amo_api.py      # 14 тестов (API клиент)
 ├── data/                    # SQLite + логи LLM (gitignored)
 ├── .env                     # Конфигурация (не в git)
 ├── SETUP.md                 # Инструкция по настройке

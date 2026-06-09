@@ -7,8 +7,10 @@
 3. Внутри каждой даты — папки тендеров (название = описание тендера)
 4. Внутри тендера — файлы (.xlsx, .docx, .doc, .pdf, .zip и т.д.)
 5. Может быть ещё одна вложенность (подпапка с любым названием)
-6. Дедупликация через SQLite: каждая папка тендера обрабатывается один раз
-7. Новые тендеры отправляются в LLM-классификатор → создаётся сделка в amoCRM
+6. Дедупликация: хеширование файлов + fuzzy-match по заказчику/НМЦ
+7. Сценарии: новый / дубль / обогащение / обновление / fuzzy-дубль
+8. Новые тендеры → LLM-классификатор → сделка в amoCRM
+9. Обогащение → обновление существующей карточки + заметка в ленту
 
 Структура диска:
     /ТОРГИ/
@@ -52,7 +54,7 @@ YADISK_TOKEN = os.getenv("YADISK_TOKEN", "")
 YADISK_ROOT_FOLDER = os.getenv("YADISK_ROOT_FOLDER", "/ТОРГИ")
 YADISK_API_BASE = "https://cloud-api.yandex.net/v1/disk"
 
-# SQLite для дедупликации
+# SQLite для дедупликации (legacy — сохраняем для обратной совместимости)
 DB_PATH = os.getenv("YADISK_DB_PATH", "data/processed_tenders.db")
 
 # Поддерживаемые расширения файлов
@@ -68,9 +70,18 @@ DATE_PATTERN = re.compile(r"^\d{2}\.\d{2}\.\d{4}$")
 # Максимальная глубина рекурсии (дата → тендер → подпапка)
 MAX_DEPTH = 3
 
+# amoCRM
+AMO_DOMAIN = os.getenv("AMO_DOMAIN", "")
+AMO_TOKEN = os.getenv("AMO_ACCESS_TOKEN", "")
+AMO_HEADERS = {
+    "Authorization": f"Bearer {AMO_TOKEN}",
+    "Content-Type": "application/json",
+}
+AMO_BASE_URL = f"https://{AMO_DOMAIN}/api/v4"
+
 
 # ═══════════════════════════════════════════════════════════════════
-# SQLITE: ДЕДУПЛИКАЦИЯ
+# SQLITE: ДЕДУПЛИКАЦИЯ (LEGACY)
 # ═══════════════════════════════════════════════════════════════════
 
 def init_db() -> sqlite3.Connection:
@@ -109,12 +120,17 @@ def init_db() -> sqlite3.Connection:
 
 
 def is_tender_processed(conn: sqlite3.Connection, folder_path: str) -> bool:
-    """Проверить, был ли тендер уже обработан."""
+    """Проверить, был ли тендер уже обработан (legacy — для первичной проверки)."""
     cursor = conn.execute(
-        "SELECT id FROM processed_tenders WHERE folder_path = ?",
+        "SELECT id, status FROM processed_tenders WHERE folder_path = ?",
         (folder_path,)
     )
-    return cursor.fetchone() is not None
+    row = cursor.fetchone()
+    if row is None:
+        return False
+    # Если статус 'pending' или 'error' — можно переобработать
+    status = row[1]
+    return status not in ("pending", "error")
 
 
 def mark_tender_processed(
@@ -256,23 +272,9 @@ class YaDiskClient:
 def scan_root_folder(client: YaDiskClient) -> list[dict]:
     """
     Сканировать корневую папку ТОРГИ.
-    
-    Возвращает список новых (необработанных) тендеров:
-    [
-        {
-            "folder_path": "/ТОРГИ/09.06.2026/Gesac - 86 поз.",
-            "folder_name": "Gesac - 86 поз.",
-            "date_folder": "09.06.2026",
-            "files": [
-                {"name": "file.xlsx", "path": "/ТОРГИ/.../file.xlsx", "size": 1234, "mime_type": "..."},
-                ...
-            ]
-        },
-        ...
-    ]
+    Возвращает ВСЕ тендеры (включая ранее обработанные — для дедупликации).
     """
-    conn = init_db()
-    new_tenders = []
+    all_tenders = []
 
     # Уровень 1: папки с датами
     root_items = client.list_folder(YADISK_ROOT_FOLDER)
@@ -297,10 +299,6 @@ def scan_root_folder(client: YaDiskClient) -> list[dict]:
             tender_path = tender_item["path"]
             tender_name = tender_item["name"]
 
-            # Проверка дедупликации
-            if is_tender_processed(conn, tender_path):
-                continue
-
             # Уровень 3: файлы тендера (+ возможная подпапка)
             files = collect_files_recursive(client, tender_path, depth=0)
 
@@ -308,16 +306,15 @@ def scan_root_folder(client: YaDiskClient) -> list[dict]:
                 logger.debug(f"    Пропуск (нет файлов): {tender_name}")
                 continue
 
-            new_tenders.append({
+            all_tenders.append({
                 "folder_path": tender_path,
                 "folder_name": tender_name,
                 "date_folder": date_name,
                 "files": files,
             })
 
-    conn.close()
-    logger.info(f"Найдено {len(new_tenders)} новых тендеров для обработки")
-    return new_tenders
+    logger.info(f"Всего тендеров на диске: {len(all_tenders)}")
+    return all_tenders
 
 
 def collect_files_recursive(client: YaDiskClient, path: str, depth: int = 0) -> list[dict]:
@@ -359,13 +356,7 @@ ARCHIVE_EXTENSIONS = {".zip"}
 def extract_archives(file_paths: list[str], extract_dir: str) -> list[str]:
     """
     Проверяет список скачанных файлов — если среди них есть .zip,
-    распаковывает их и возвращает обновлённый список файлов
-    (архивы заменены на их содержимое).
-
-    Поддерживает:
-    - .zip (включая вложенные zip-в-zip, 1 уровень)
-    - Фильтрацию по расширению (только полезные файлы)
-    - Защиту от zip-бомб (макс 100 файлов, макс 500 MB)
+    распаковывает их и возвращает обновлённый список файлов.
     """
     result_files = []
 
@@ -381,7 +372,6 @@ def extract_archives(file_paths: list[str], extract_dir: str) -> list[str]:
                     f"{len(extracted)} файлов"
                 )
             else:
-                # Не удалось распаковать — оставляем архив как есть
                 result_files.append(fpath)
                 logger.warning(
                     f"⚠️ Не удалось распаковать: {os.path.basename(fpath)}"
@@ -398,16 +388,7 @@ def _extract_zip(
     max_files: int = 100,
     max_total_bytes: int = 500 * 1024 * 1024,
 ) -> list[str]:
-    """
-    Распаковать ZIP-архив во временную папку.
-
-    Защита:
-    - Максимум max_files файлов из одного архива
-    - Максимум max_total_bytes суммарно
-    - Игнорирует path traversal (файлы с ../)
-    - Игнорирует скрытые файлы (._*, __MACOSX, ~$*)
-    - Вложенные zip тоже распаковываются (1 уровень)
-    """
+    """Распаковать ZIP-архив во временную папку."""
     try:
         if not zipfile.is_zipfile(zip_path):
             logger.warning(f"Не является валидным ZIP: {zip_path}")
@@ -423,7 +404,6 @@ def _extract_zip(
         with zipfile.ZipFile(zip_path, "r") as zf:
             members = zf.infolist()
 
-            # Защита от zip-бомб
             if len(members) > max_files:
                 logger.warning(
                     f"ZIP содержит {len(members)} файлов "
@@ -463,10 +443,9 @@ def _extract_zip(
                     )
                     break
 
-                # Извлекаем файл (плоская структура — все в одну папку)
+                # Извлекаем файл (плоская структура)
                 out_path = os.path.join(out_dir, basename)
 
-                # Если файл с таким именем уже есть — добавляем суффикс
                 counter = 1
                 while os.path.exists(out_path):
                     name_no_ext = os.path.splitext(basename)[0]
@@ -503,6 +482,46 @@ def _extract_zip(
 
 
 # ═════════════════════════════════════════════════════════════════
+# ИНТЕГРАЦИЯ С ДЕДУПЛИКАЦИЕЙ
+# ═════════════════════════════════════════════════════════════════
+
+def _post_note_to_lead(lead_id: int, text: str):
+    """Написать заметку в ленту карточки amoCRM."""
+    try:
+        payload = [{"note_type": "common", "params": {"text": text}}]
+        resp = requests.post(
+            f"{AMO_BASE_URL}/leads/{lead_id}/notes",
+            json=payload,
+            headers=AMO_HEADERS,
+            timeout=10,
+        )
+        if resp.status_code in (200, 201):
+            logger.info(f"Заметка записана в lead {lead_id}")
+        else:
+            logger.error(f"Ошибка записи заметки: {resp.status_code} {resp.text}")
+    except Exception as e:
+        logger.error(f"Ошибка при записи заметки: {e}")
+
+
+def _update_lead_fields(lead_id: int, custom_fields: list[dict]):
+    """Обновить поля карточки amoCRM."""
+    try:
+        payload = {"custom_fields_values": custom_fields}
+        resp = requests.patch(
+            f"{AMO_BASE_URL}/leads/{lead_id}",
+            json=payload,
+            headers=AMO_HEADERS,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            logger.info(f"Поля обновлены для lead {lead_id}")
+        else:
+            logger.error(f"Ошибка обновления полей: {resp.status_code} {resp.text}")
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении полей: {e}")
+
+
+# ═════════════════════════════════════════════════════════════════
 # ОСНОВНАЯ ФУНКЦИЯ (CRON)
 # ═══════════════════════════════════════════════════════════════════
 
@@ -510,38 +529,56 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
     """
     Основная функция — запускается каждый час.
     
+    Пайплайн:
     1. Сканирует Яндекс.Диск
-    2. Находит новые тендеры
-    3. Скачивает файлы во временную папку
-    4. Отправляет в LLM-классификатор (если подключён)
-    5. Создаёт сделки в amoCRM
+    2. Для каждого тендера скачивает файлы и вычисляет хеши
+    3. Проверяет дедупликацию (хеши + fuzzy)
+    4. По результату:
+       - Новый → LLM-классификация → создание сделки
+       - Дубль → игнорирование + заметка
+       - Обогащение → обновление карточки + заметка
+       - Обновление → перезапуск LLM + обновление карточки
+       - Fuzzy-дубль → создание сделки + предупреждение
+    5. Валидация полей после создания/обновления
     
     Args:
         dry_run: если True — только сканирование, без создания сделок
         
     Returns:
-        Статистика: {new_tenders, processed, errors, skipped}
+        Статистика: {new, duplicates, enriched, updated, fuzzy, errors}
     """
     if not YADISK_TOKEN:
         logger.error("YADISK_TOKEN не задан в .env")
         return {"error": "YADISK_TOKEN not configured"}
 
+    # Импортируем дедупликатор
+    from .deduplication import (
+        TenderDeduplicator, DeduplicationDB, FileRecord,
+        compute_file_hash, format_enrichment_note,
+    )
+
     client = YaDiskClient()
     conn = init_db()
+    dedup_db = DeduplicationDB(DB_PATH)
+    deduplicator = TenderDeduplicator(dedup_db)
 
     stats = {
-        "new_tenders": 0,
-        "processed": 0,
+        "total_scanned": 0,
+        "new": 0,
+        "duplicates": 0,
+        "enriched": 0,
+        "updated": 0,
+        "fuzzy": 0,
         "errors": 0,
         "skipped": 0,
         "details": [],
     }
 
     try:
-        new_tenders = scan_root_folder(client)
-        stats["new_tenders"] = len(new_tenders)
+        all_tenders = scan_root_folder(client)
+        stats["total_scanned"] = len(all_tenders)
 
-        for tender in new_tenders:
+        for tender in all_tenders:
             folder_path = tender["folder_path"]
             folder_name = tender["folder_name"]
             date_folder = tender["date_folder"]
@@ -549,30 +586,10 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
 
             total_size = sum(f["size"] for f in files)
 
-            logger.info(f"Обработка: {folder_name} ({len(files)} файлов, {total_size / 1024:.0f} KB)")
-
-            # Записываем как pending
-            tender_id = mark_tender_processed(
-                conn, folder_path, folder_name, date_folder,
-                file_count=len(files), total_size=total_size,
-                status="pending"
-            )
-
-            if dry_run:
-                update_tender_status(conn, folder_path, status="dry_run")
-                stats["processed"] += 1
-                stats["details"].append({
-                    "name": folder_name,
-                    "date": date_folder,
-                    "files": len(files),
-                    "size_kb": round(total_size / 1024),
-                    "status": "dry_run",
-                })
-                continue
-
-            # ─── Скачивание файлов ───────────────────────────────
-            tmp_dir = tempfile.mkdtemp(prefix=f"tender_{tender_id}_")
+            # ─── Скачивание файлов для хеширования ───────────────
+            tmp_dir = tempfile.mkdtemp(prefix=f"tender_dedup_")
             downloaded_files = []
+            file_records = []
 
             for file_info in files:
                 local_name = os.path.basename(file_info["path"])
@@ -580,13 +597,165 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
 
                 if client.download_file(file_info["path"], local_path):
                     downloaded_files.append(local_path)
+                    # Вычисляем хеш
+                    file_hash = compute_file_hash(local_path)
+                    file_records.append(FileRecord(
+                        filename=local_name,
+                        file_hash=file_hash,
+                        file_size=file_info["size"],
+                        file_path=file_info["path"],
+                    ))
 
-            # Распаковка ZIP-архивов
-            downloaded_files = extract_archives(downloaded_files, tmp_dir)
-
-            if not downloaded_files:
-                update_tender_status(conn, folder_path, status="error", error="No files downloaded")
+            if not file_records:
+                logger.warning(f"Не удалось скачать файлы: {folder_name}")
                 stats["errors"] += 1
+                continue
+
+            # ─── Дедупликация ────────────────────────────────────
+            # Извлекаем заказчика из имени папки (простая эвристика)
+            customer_hint = _extract_customer_from_folder_name(folder_name)
+
+            dedup_result = deduplicator.check(
+                tender_path=folder_path,
+                files=file_records,
+                customer=customer_hint,
+                nmc=0,  # НМЦ пока неизвестна до LLM
+            )
+
+            # ─── Обработка по типу ───────────────────────────────
+            if dedup_result.is_exact_duplicate:
+                # 100% дубль — игнорируем
+                stats["duplicates"] += 1
+                if dedup_result.existing_lead_id and not dry_run:
+                    _post_note_to_lead(
+                        dedup_result.existing_lead_id,
+                        dedup_result.message
+                    )
+                stats["details"].append({
+                    "name": folder_name,
+                    "date": date_folder,
+                    "action": "duplicate_ignored",
+                    "existing_lead": dedup_result.existing_lead_id,
+                })
+                logger.info(f"  ⏭️ Дубль: {folder_name}")
+                continue
+
+            elif dedup_result.is_enrichment:
+                # Обогащение — обновляем карточку
+                stats["enriched"] += 1
+
+                if not dry_run and dedup_result.existing_lead_id:
+                    # Распаковываем архивы
+                    all_files = extract_archives(downloaded_files, tmp_dir)
+
+                    # Перезапускаем LLM только на новых файлах
+                    new_file_paths = [
+                        f for f in all_files
+                        if os.path.basename(f) in dedup_result.new_files
+                    ]
+
+                    # Пишем заметку об обогащении
+                    note_text = format_enrichment_note(dedup_result)
+                    _post_note_to_lead(dedup_result.existing_lead_id, note_text)
+
+                    # Обновляем хеши в базе
+                    dedup_db.save_tender(
+                        tender_path=folder_path,
+                        files=file_records,
+                        lead_id=dedup_result.existing_lead_id,
+                    )
+
+                    # TODO: Перезапуск LLM на новых файлах для обновления полей
+
+                stats["details"].append({
+                    "name": folder_name,
+                    "date": date_folder,
+                    "action": "enriched",
+                    "new_files": dedup_result.new_files,
+                    "existing_lead": dedup_result.existing_lead_id,
+                })
+                logger.info(
+                    f"  📎 Обогащение: {folder_name} "
+                    f"(+{len(dedup_result.new_files)} файлов)"
+                )
+                continue
+
+            elif dedup_result.is_update:
+                # Обновление файлов — перезапускаем анализ
+                stats["updated"] += 1
+
+                if not dry_run and dedup_result.existing_lead_id:
+                    all_files = extract_archives(downloaded_files, tmp_dir)
+
+                    # Пишем заметку
+                    _post_note_to_lead(
+                        dedup_result.existing_lead_id,
+                        dedup_result.message
+                    )
+
+                    # Обновляем хеши
+                    dedup_db.save_tender(
+                        tender_path=folder_path,
+                        files=file_records,
+                        lead_id=dedup_result.existing_lead_id,
+                    )
+
+                    # TODO: Перезапуск LLM для обновления классификации
+
+                stats["details"].append({
+                    "name": folder_name,
+                    "date": date_folder,
+                    "action": "updated",
+                    "updated_files": dedup_result.updated_files,
+                    "existing_lead": dedup_result.existing_lead_id,
+                })
+                logger.info(
+                    f"  🔄 Обновление: {folder_name} "
+                    f"({len(dedup_result.updated_files)} файлов изменились)"
+                )
+                continue
+
+            elif dedup_result.is_fuzzy_duplicate:
+                # Fuzzy-дубль — создаём отдельную карточку с предупреждением
+                stats["fuzzy"] += 1
+                logger.info(
+                    f"  ⚠️ Fuzzy-дубль: {folder_name} "
+                    f"(score={dedup_result.match_score:.2f})"
+                )
+                # Продолжаем как новый тендер, но с предупреждением
+                # (не делаем continue — пойдёт дальше в обработку нового)
+
+            # ─── Новый тендер (или fuzzy-дубль) ──────────────────
+            stats["new"] += 1
+            logger.info(f"  🆕 Новый: {folder_name} ({len(files)} файлов)")
+
+            # Распаковка ZIP
+            all_files = extract_archives(downloaded_files, tmp_dir)
+
+            # Записываем в legacy DB
+            mark_tender_processed(
+                conn, folder_path, folder_name, date_folder,
+                file_count=len(files), total_size=total_size,
+                status="pending"
+            )
+
+            if dry_run:
+                update_tender_status(conn, folder_path, status="dry_run")
+                # Сохраняем хеши для будущей дедупликации
+                dedup_db.save_tender(
+                    tender_path=folder_path,
+                    files=file_records,
+                    customer=customer_hint,
+                    date_folder=date_folder,
+                )
+                stats["details"].append({
+                    "name": folder_name,
+                    "date": date_folder,
+                    "files": len(files),
+                    "size_kb": round(total_size / 1024),
+                    "action": "dry_run",
+                    "is_fuzzy": dedup_result.is_fuzzy_duplicate,
+                })
                 continue
 
             # ─── LLM Классификация ───────────────────────────────
@@ -595,31 +764,53 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                 result = classify_tender(
                     folder_name=folder_name,
                     date_folder=date_folder,
-                    files=downloaded_files,
+                    files=all_files,
                 )
+
+                # Сохраняем в dedup DB с данными от LLM
+                dedup_db.save_tender(
+                    tender_path=folder_path,
+                    files=file_records,
+                    customer=result.get("customer", customer_hint),
+                    nmc=result.get("nmc", 0),
+                    direction=result.get("direction"),
+                    date_folder=date_folder,
+                )
+
                 update_tender_status(
                     conn, folder_path,
                     status="classified",
                     llm_result=json.dumps(result, ensure_ascii=False),
                 )
-                stats["processed"] += 1
+
+                # Если fuzzy-дубль — добавляем предупреждение
+                if dedup_result.is_fuzzy_duplicate:
+                    result["_fuzzy_warning"] = dedup_result.message
+
                 stats["details"].append({
                     "name": folder_name,
                     "date": date_folder,
                     "files": len(files),
-                    "status": "classified",
+                    "action": "classified",
                     "result": result,
+                    "is_fuzzy": dedup_result.is_fuzzy_duplicate,
                 })
+
             except ImportError:
-                # LLM-модуль ещё не подключён — просто записываем
                 update_tender_status(conn, folder_path, status="awaiting_llm")
-                stats["processed"] += 1
+                dedup_db.save_tender(
+                    tender_path=folder_path,
+                    files=file_records,
+                    customer=customer_hint,
+                    date_folder=date_folder,
+                )
                 stats["details"].append({
                     "name": folder_name,
                     "date": date_folder,
                     "files": len(files),
-                    "status": "awaiting_llm",
+                    "action": "awaiting_llm",
                 })
+
             except Exception as e:
                 logger.error(f"Ошибка LLM для {folder_name}: {e}")
                 update_tender_status(conn, folder_path, status="error", error=str(e))
@@ -633,11 +824,32 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
         conn.close()
 
     logger.info(
-        f"Итог: новых={stats['new_tenders']}, "
-        f"обработано={stats['processed']}, "
-        f"ошибок={stats['errors']}"
+        f"Итог: всего={stats['total_scanned']}, "
+        f"новых={stats['new']}, дублей={stats['duplicates']}, "
+        f"обогащено={stats['enriched']}, обновлено={stats['updated']}, "
+        f"fuzzy={stats['fuzzy']}, ошибок={stats['errors']}"
     )
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ═══════════════════════════════════════════════════════════════════
+
+def _extract_customer_from_folder_name(folder_name: str) -> str:
+    """
+    Попытаться извлечь название заказчика из имени папки тендера.
+    
+    Примеры:
+    - "АО НПП ИСТОК ШОКИНА - Не интересно - Калибры" → "АО НПП ИСТОК ШОКИНА"
+    - "Gesac - 86 поз." → "Gesac"
+    - "АО ОКБ ФАКЕЛ - твердосплав 350к руб" → "АО ОКБ ФАКЕЛ"
+    """
+    # Разделяем по " - " и берём первую часть
+    parts = folder_name.split(" - ")
+    if parts:
+        return parts[0].strip()
+    return folder_name.strip()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -649,3 +861,5 @@ if __name__ == "__main__":
     dry_run = os.getenv("DRY_RUN", "1") == "1"
     result = run_yadisk_scan(dry_run=dry_run)
     print(json.dumps(result, ensure_ascii=False, indent=2))
+"""
+"""
