@@ -766,11 +766,13 @@ def build_emulate_command(parsed: dict, files: list, tender_path: str = "") -> s
 # ВАЛИДАЦИЯ + OCR-FALLBACK
 # ═══════════════════════════════════════════════════════════════════
 
-# Обязательные поля и ключевые слова для OCR-верификации
+# Все поля, которые идут в карточку amoCRM, с ключевыми словами для OCR-верификации
+# severity: "block" = без этого нельзя создать сделку, "warn" = создать можно, но пометить
 REQUIRED_FIELDS = {
+    # --- Критичные (block) ---
     "customer": {
         "label": "Заказчик",
-        "severity": "block",  # без этого нельзя создать сделку
+        "severity": "block",
         "ocr_keywords": ["Наименование", "Заказчик", "Организатор"],
     },
     "nmc": {
@@ -783,6 +785,7 @@ REQUIRED_FIELDS = {
         "severity": "block",
         "ocr_keywords": ["подачи", "Окончание", "срок"],
     },
+    # --- Важные (warn) ---
     "procedure_number": {
         "label": "Номер закупки",
         "severity": "warn",
@@ -793,12 +796,53 @@ REQUIRED_FIELDS = {
         "severity": "warn",
         "ocr_keywords": ["площадка", "ЭТП", "etprf"],
     },
+    "position_count": {
+        "label": "Кол-во позиций",
+        "severity": "warn",
+        "ocr_keywords": ["позиц", "Лот", "Спецификац"],
+    },
+    "equivalent_allowed": {
+        "label": "Эквивалент",
+        "severity": "warn",
+        "ocr_keywords": ["эквивалент", "аналог", "или эквивалент"],
+    },
+    "gisp_required": {
+        "label": "ГИСП",
+        "severity": "warn",
+        "ocr_keywords": ["ГИСП", "gisp", "реестр"],
+    },
+    "procedure_type": {
+        "label": "Тип процедуры",
+        "severity": "warn",
+        "ocr_keywords": ["способ", "закупки", "котировок", "аукцион"],
+    },
+    "subject": {
+        "label": "Предмет закупки",
+        "severity": "warn",
+        "ocr_keywords": ["Предмет", "Наименование закупки", "Поставка"],
+    },
+    "city": {
+        "label": "Город",
+        "severity": "warn",
+        "ocr_keywords": ["Место", "адрес", "поставки"],
+    },
+    "notice_number": {
+        "label": "Номер извещения",
+        "severity": "warn",
+        "ocr_keywords": ["извещени", "Номер", "реестровый"],
+    },
+    "direction_hint": {
+        "label": "Направление",
+        "severity": "warn",
+        "ocr_keywords": [],  # определяется по продуктам, OCR не нужен
+    },
 }
 
 # Поля, где низкая уверенность требует OCR-проверки
 CONFIDENCE_THRESHOLDS = {
     "nmc": {"min_value": 100_000, "max_value": 10_000_000_000},
     "deadline": {"min_year": 2024, "max_year": 2030},
+    "position_count": {"min_value": 1, "max_value": 5000},
 }
 
 
@@ -869,7 +913,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
         # === Поле найдено — проверка адекватности ===
         confidence = 1.0
         
-        # Проверка НМЦ
+        # Проверка НМЦ: диапазон 100К - 10 млрд
         if field == "nmc" and field in CONFIDENCE_THRESHOLDS:
             thresholds = CONFIDENCE_THRESHOLDS[field]
             nmc_val = parsed["nmc"]
@@ -884,7 +928,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
                     f"НМЦ подозрительно велика: {nmc_val:,.0f} руб. (> {thresholds['max_value']:,.0f})"
                 )
         
-        # Проверка дедлайна
+        # Проверка дедлайна: год 2024-2030
         if field == "deadline" and field in CONFIDENCE_THRESHOLDS:
             thresholds = CONFIDENCE_THRESHOLDS[field]
             try:
@@ -897,7 +941,7 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
             except (ValueError, IndexError):
                 confidence = 0.5
         
-        # Проверка заказчика
+        # Проверка заказчика: орг.форма + длина
         if field == "customer":
             cust = parsed["customer"]
             if len(cust) < 10:
@@ -905,6 +949,71 @@ def validate_and_ocr_fallback(parsed: dict, pdf_files: list, full_text: str) -> 
             elif not any(kw in cust for kw in ["общество", "АО", "ПАО", "ООО", "ФГУП", "ГК", "ФКП",
                                                 "Общество", "Акционерное", "Федеральное"]):
                 confidence = 0.6
+        
+        # Проверка кол-ва позиций: диапазон 1-5000
+        if field == "position_count" and field in CONFIDENCE_THRESHOLDS:
+            thresholds = CONFIDENCE_THRESHOLDS[field]
+            pos_val = parsed["position_count"]
+            if pos_val < thresholds["min_value"]:
+                confidence = 0.4
+                parsed["warnings"].append(
+                    f"Кол-во позиций = {pos_val} (подозрительно)"
+                )
+            elif pos_val > thresholds["max_value"]:
+                confidence = 0.5
+                parsed["warnings"].append(
+                    f"Кол-во позиций = {pos_val} (подозрительно много)"
+                )
+        
+        # Проверка эквивалента: должен быть bool
+        if field == "equivalent_allowed":
+            if not isinstance(value, bool):
+                confidence = 0.6
+        
+        # Проверка ГИСП: должен быть bool
+        if field == "gisp_required":
+            if not isinstance(value, bool):
+                confidence = 0.6
+        
+        # Проверка типа процедуры: должен содержать известные ключевые слова
+        if field == "procedure_type":
+            known_types = ["запрос котировок", "аукцион", "конкурс", "запрос предложений",
+                           "единственный поставщик", "открытый", "закрытый"]
+            if not any(kt in str(value).lower() for kt in known_types):
+                confidence = 0.6
+                parsed["warnings"].append(
+                    f"Тип процедуры не распознан как стандартный: '{value}'"
+                )
+        
+        # Проверка предмета: должен содержать слова про инструмент/поставку
+        if field == "subject":
+            if len(str(value)) < 10:
+                confidence = 0.5
+            elif not any(kw in str(value).lower() for kw in ["поставка", "инструмент", "выполнение",
+                                                             "оказание", "изготовление", "производство"]):
+                confidence = 0.7  # не снижаем сильно, может быть нестандартная формулировка
+        
+        # Проверка города: должен содержать "г." или известный город
+        if field == "city":
+            known_cities = ["Москв", "Петербург", "Новосибирск", "Екатеринбург",
+                            "Нижний", "Казан", "Челябинск", "Омск", "Самар",
+                            "Ростов", "Уф", "Красноярск", "Перм", "Воронеж",
+                            "Волгоград", "Тул", "Томск", "Новгород", "г."]
+            if not any(c in str(value) for c in known_cities):
+                confidence = 0.6
+                parsed["warnings"].append(
+                    f"Город не распознан как известный: '{value}'"
+                )
+        
+        # Проверка направления: должно быть из известного списка
+        if field == "direction_hint":
+            known_directions = ["CARBIDE-STANDARD", "CARBIDE-SPECIAL", "HSS", "DIAMOND",
+                                "SPEC-DRAWING", "MEASUREMENT", "TOOLING", "OTHER"]
+            if str(value) not in known_directions:
+                confidence = 0.6
+                parsed["warnings"].append(
+                    f"Направление не из стандартного списка: '{value}'"
+                )
         
         # Если confidence низкая — OCR-верификация
         if confidence < 0.7 and pdf_files:
