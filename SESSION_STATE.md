@@ -1,7 +1,7 @@
 # SESSION STATE — Точка продолжения
 
-> Последнее обновление: 09.06.2026 (PATCH9)
-> Коммит: PATCH9 — Тендер Promatool (98 поз., 49.96 млн) → сделка 3160177
+> Последнее обновление: 10.06.2026 (PATCH12)
+> Коммит: PATCH12 — Расширенный confidence scoring (13 полей) + OCR-fallback
 > Репозиторий: https://github.com/megawinrar/Manus_AmoCRM_RETEK
 
 ---
@@ -123,6 +123,37 @@
 | 1 | 3156121 | НПО Высокоточные комплексы | 6 719 075,91 | Р1 | 5. Передано в закупку |
 | 2 | 3153625 | (дубль → архив) | — | Р4 | Архив — дубли |
 | 3 | 3160177 | ЦНИИ Буревестник | 49 960 625,50 | Р2 | 5. Передано в закупку |
+
+### 13. Быстрая экстракция + парсинг (PATCH10-12)
+- `scripts/extract_and_classify.py` — полный цикл экстракции + парсинга тендерных файлов
+- **Время:** ~2.5 сек на 6 файлов (9 MB, 640K символов)
+- **Экстракция:** pdftotext / python-docx / openpyxl
+- **OCR-fallback:** pytesseract + pdf2image (только когда нужно)
+- **Детекция сканов:** < 100 симв/стр → авто-OCR
+- **Валидация:** 13 полей с confidence scoring (0.0–1.0)
+- **OCR-верификация:** точечный OCR региона вокруг ключевого слова при confidence < 0.7
+- **Статусы:** `ok` | `warnings` | `blocked`
+- **Режимы вывода:** терминал / `--json` / `--command` (генерация команды для emulate_llm_with_dedup.py)
+- **Поля с скорингом:**
+
+| Поле | Проверка | Severity |
+|---|---|---|
+| customer | Орг.форма + длина > 10 | block |
+| nmc | 100К < НМЦ < 10 млрд | block |
+| deadline | Год 2024-2030 | block |
+| procedure_number | Наличие | warn |
+| platform | Наличие | warn |
+| position_count | 1 ≤ кол-во ≤ 5000 | warn |
+| equivalent_allowed | Тип bool | warn |
+| gisp_required | Тип bool | warn |
+| procedure_type | Известный тип (котировки/аукцион/конкурс) | warn |
+| subject | Содержит поставка/инструмент + длина | warn |
+| city | Известный город РФ | warn |
+| notice_number | Наличие | warn |
+| direction_hint | Из enum (CARBIDE/HSS/DIAMOND/...) | warn |
+
+- **Тест Promatool:** все 13 полей = 1.0, status = ok, OCR не потребовался
+- `scripts/benchmark_extraction.py` — диагностика времени экстракции
 
 ---
 
