@@ -1,0 +1,254 @@
+{
+  "meta": {
+    "lead_id": 3156121,
+    "event": "before_enrichment",
+    "timestamp": "2026-06-09T15:41:33.975924"
+  },
+  "lead": {
+    "id": 3156121,
+    "name": "Р2 / НПО Высокоточные комплексы / Gesac 86 поз. / 6.7 млн",
+    "price": 6719076,
+    "price_with_minor_units": 6719076.0,
+    "responsible_user_id": 13902646,
+    "group_id": 0,
+    "status_id": 86357674,
+    "pipeline_id": 10984442,
+    "loss_reason_id": null,
+    "created_by": 0,
+    "updated_by": 0,
+    "created_at": 1781017388,
+    "updated_at": 1781017392,
+    "closed_at": null,
+    "closest_task_at": 1781190190,
+    "is_deleted": false,
+    "custom_fields_values": [
+      {
+        "field_id": 380299,
+        "field_name": "Заказчик",
+        "field_code": null,
+        "field_type": "text",
+        "values": [
+          {
+            "value": "АО «НПО «Высокоточные комплексы»"
+          }
+        ]
+      },
+      {
+        "field_id": 380305,
+        "field_name": "Тип ситуации",
+        "field_code": null,
+        "field_type": "select",
+        "values": [
+          {
+            "value": "Запрос котировок / реальные торги",
+            "enum_id": 215657,
+            "enum_code": null
+          }
+        ]
+      },
+      {
+        "field_id": 380309,
+        "field_name": "Приоритет",
+        "field_code": null,
+        "field_type": "select",
+        "values": [
+          {
+            "value": "Р2 — Быстрые Деньги",
+            "enum_id": 215675,
+            "enum_code": null
+          }
+        ]
+      },
+      {
+        "field_id": 380311,
+        "field_name": "Направление",
+        "field_code": null,
+        "field_type": "select",
+        "values": [
+          {
+            "value": "CARBIDE-STANDARD — стандартный твердосплав",
+            "enum_id": 215685,
+            "enum_code": null
+          }
+        ]
+      },
+      {
+        "field_id": 380315,
+        "field_name": "НМЦ",
+        "field_code": null,
+        "field_type": "numeric",
+        "values": [
+          {
+            "value": "6719075.91"
+          }
+        ]
+      },
+      {
+        "field_id": 380317,
+        "field_name": "Срок подачи",
+        "field_code": null,
+        "field_type": "date",
+        "values": [
+          {
+            "value": 1781028000
+          }
+        ]
+      },
+      {
+        "field_id": 380293,
+        "field_name": "Источник",
+        "field_code": null,
+        "field_type": "select",
+        "values": [
+          {
+            "value": "Тендерная площадка",
+            "enum_id": 215645,
+            "enum_code": null
+          }
+        ]
+      },
+      {
+        "field_id": 380307,
+        "field_name": "Тип процедуры",
+        "field_code": null,
+        "field_type": "select",
+        "values": [
+          {
+            "value": "Запрос котировок",
+            "enum_id": 215663,
+            "enum_code": null
+          }
+        ]
+      },
+      {
+        "field_id": 380303,
+        "field_name": "Номер процедуры",
+        "field_code": null,
+        "field_type": "text",
+        "values": [
+          {
+            "value": "SP26061000158"
+          }
+        ]
+      },
+      {
+        "field_id": 380349,
+        "field_name": "LLM confidence",
+        "field_code": null,
+        "field_type": "numeric",
+        "values": [
+          {
+            "value": "0.97"
+          }
+        ]
+      },
+      {
+        "field_id": 380351,
+        "field_name": "LLM comment",
+        "field_code": null,
+        "field_type": "textarea",
+        "values": [
+          {
+            "value": "Закрытый запрос котировок. 86 позиций стандартного каталожного твердосплава Gesac (71 сверло, 13 фрез, 1 корпус фрезы, 1 пластина). НМЦ 6 719 075,91 руб. Эквивалент допускается. Нет ГИСП/ЕПОЗ. Совпадение с ассортиментом >96%. Срок поставки 90 дней. Дедлайн подачи 10.06.2026."
+          }
+        ]
+      },
+      {
+        "field_id": 380319,
+        "field_name": "Следующее действие",
+        "field_code": null,
+        "field_type": "text",
+        "values": [
+          {
+            "value": "Рассчитать себестоимость, подготовить КП"
+          }
+        ]
+      },
+      {
+        "field_id": 380329,
+        "field_name": "Нужна закупка / расчёт",
+        "field_code": null,
+        "field_type": "checkbox",
+        "values": [
+          {
+            "value": true
+          }
+        ]
+      }
+    ],
+    "score": null,
+    "account_id": 33089674,
+    "labor_cost": null,
+    "_links": {
+      "self": {
+        "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121?page=1&limit=250"
+      }
+    },
+    "_embedded": {
+      "tags": [],
+      "companies": []
+    },
+    "_notes": [
+      {
+        "id": 3939097,
+        "entity_id": 3156121,
+        "created_by": 0,
+        "updated_by": 0,
+        "created_at": 1781017396,
+        "updated_at": 1781017396,
+        "responsible_user_id": 13902646,
+        "group_id": 0,
+        "note_type": "common",
+        "params": {
+          "text": "LLM-классификатор (эмуляция)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nПриоритет: Р2\nНаправление: CARBIDE-STANDARD\nПодтип: каталожный твердосплав без ГИСП, возможен аналог (CARB-02)\nТип ситуации: Запрос котировок / реальные торги\nЗаказчик: АО «НПО «Высокоточные комплексы»\nНМЦ: 6 719 075,91 руб.\nНомер процедуры: SP26061000158\nУверенность: 0.97\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nКомментарий: Закрытый запрос котировок. 86 позиций стандартного каталожного твердосплава Gesac (71 сверло, 13 фрез, 1 корпус фрезы, 1 пластина). НМЦ 6 719 075,91 руб. Эквивалент допускается. Нет ГИСП/ЕПОЗ. Совпадение с ассортиментом &gt;96%. Срок поставки 90 дней. Дедлайн подачи 10.06.2026.\n\nМаршрутизация: Р2 + Реальные торги → Статус 5 (Передано в закупку) → Сотрудник 3\n\nФайлы тендера:\n- 0201-2026-00592 Поставка инструментов — Закупка вх.№193679.pdf\n- ИоЗ.docx\n- ИоЗ_Приложение№1_Проектдоговора.doc\n- ИоЗ_Приложение№2_Требованиякпродукции.doc.docx\n- ИоЗ_Приложение№3_ОбоснованиеНМЦ.doc\n- Приложение№1кдоговору.doc\n- Техническое предложение (Форма4).xlsx"
+        },
+        "account_id": 33089674,
+        "_links": {
+          "self": {
+            "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939097?limit=250&page=1"
+          }
+        }
+      },
+      {
+        "id": 3939839,
+        "entity_id": 3156121,
+        "created_by": 0,
+        "updated_by": 0,
+        "created_at": 1781019330,
+        "updated_at": 1781019330,
+        "responsible_user_id": 13902646,
+        "group_id": 0,
+        "note_type": "common",
+        "params": {
+          "text": "Обнаружен и обработан дубль: #3153625\n\nДубль перенесён в архив (воронка Направления → Дубли).\nЭта карточка является основной.\n\nДедупликация: 09.06.2026 15:35"
+        },
+        "account_id": 33089674,
+        "_links": {
+          "self": {
+            "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939839?limit=250&page=1"
+          }
+        }
+      },
+      {
+        "id": 3939847,
+        "entity_id": 3156121,
+        "created_by": 0,
+        "updated_by": 0,
+        "created_at": 1781019362,
+        "updated_at": 1781019362,
+        "responsible_user_id": 13902646,
+        "group_id": 0,
+        "note_type": "common",
+        "params": {
+          "text": "Обнаружен и обработан дубль: #3153625\n\nДубль перенесён в архив (воронка Направления → Дубли).\nЭта карточка является основной.\n\nДедупликация: 09.06.2026 15:36"
+        },
+        "account_id": 33089674,
+        "_links": {
+          "self": {
+            "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939847?limit=250&page=1"
+          }
+        }
+      }
+    ]
+  }
+}

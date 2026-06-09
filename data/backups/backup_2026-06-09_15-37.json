@@ -1,0 +1,1092 @@
+{
+  "meta": {
+    "timestamp": "2026-06-09T15:37:37.929431",
+    "domain": "tokutools.amocrm.ru",
+    "leads_count": 6,
+    "tasks_count": 4,
+    "pipelines": {
+      "active": 10984442,
+      "archive_directions": 10984454,
+      "archive_soz": 10985038
+    }
+  },
+  "leads": [
+    {
+      "id": 3106185,
+      "name": "ПРОТОН-ПМ",
+      "price": 1500000,
+      "price_with_minor_units": 1500000.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": null,
+      "pipeline_id": 10984454,
+      "loss_reason_id": null,
+      "created_by": 13902646,
+      "updated_by": 13902646,
+      "created_at": 1780837195,
+      "updated_at": 1780863521,
+      "closed_at": null,
+      "closest_task_at": 1781335800,
+      "is_deleted": false,
+      "custom_fields_values": null,
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3106185?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [
+          {
+            "id": 31611,
+            "name": "Р1_Срочно",
+            "color": null
+          }
+        ],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": [
+        {
+          "id": 3836801,
+          "entity_id": 3106185,
+          "created_by": 13902646,
+          "updated_by": 13902646,
+          "created_at": 1780837249,
+          "updated_at": 1780837250,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "Фрезы hss / группа HSS07 - СОЗ"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3106185/notes/3836801?limit=250&page=1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3111937,
+      "name": "TEST DEAL",
+      "price": 100,
+      "price_with_minor_units": 100.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": 86357674,
+      "pipeline_id": 10984442,
+      "loss_reason_id": null,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1780874901,
+      "updated_at": 1780874901,
+      "closed_at": null,
+      "closest_task_at": null,
+      "is_deleted": false,
+      "custom_fields_values": [
+        {
+          "field_id": 380305,
+          "field_name": "Тип ситуации",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок / реальные торги",
+              "enum_id": 215657,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380309,
+          "field_name": "Приоритет",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Р1 — Срочно",
+              "enum_id": 215673,
+              "enum_code": null
+            }
+          ]
+        }
+      ],
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3111937?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": []
+    },
+    {
+      "id": 3111941,
+      "name": "DEBUG TEST",
+      "price": 0,
+      "price_with_minor_units": 0.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": 86357674,
+      "pipeline_id": 10984442,
+      "loss_reason_id": null,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1780874961,
+      "updated_at": 1780874961,
+      "closed_at": null,
+      "closest_task_at": null,
+      "is_deleted": false,
+      "custom_fields_values": [
+        {
+          "field_id": 380291,
+          "field_name": "Внешний ID заявки",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "0201-2026-02391"
+            }
+          ]
+        }
+      ],
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3111941?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": []
+    },
+    {
+      "id": 3111945,
+      "name": "Сделка #3111945",
+      "price": 19139188,
+      "price_with_minor_units": 19139188.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": 86357658,
+      "pipeline_id": 10984442,
+      "loss_reason_id": null,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1780875063,
+      "updated_at": 1780878301,
+      "closed_at": null,
+      "closest_task_at": 1780837200,
+      "is_deleted": false,
+      "custom_fields_values": [
+        {
+          "field_id": 380291,
+          "field_name": "Внешний ID заявки",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "0201-2026-02391"
+            }
+          ]
+        },
+        {
+          "field_id": 380293,
+          "field_name": "Источник",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Тендерная площадка",
+              "enum_id": 215645,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380295,
+          "field_name": "Ссылка на площадку",
+          "field_code": null,
+          "field_type": "url",
+          "values": [
+            {
+              "value": "https://sfilee223.etprf.ru/?path=sfilee223/2026/06/02/I1129783-5a63-40ca-b293-f4aa19b4f568.83307FDC4D249A23A62B81F0C18D9E37.html"
+            }
+          ]
+        },
+        {
+          "field_id": 380299,
+          "field_name": "Заказчик",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "АО КБП им. академика А.Г. Шипунова"
+            }
+          ]
+        },
+        {
+          "field_id": 380303,
+          "field_name": "Номер процедуры",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "SP26052500177 / 0201-2026-02391"
+            }
+          ]
+        },
+        {
+          "field_id": 380305,
+          "field_name": "Тип ситуации",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок / реальные торги",
+              "enum_id": 215657,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380307,
+          "field_name": "Тип процедуры",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок",
+              "enum_id": 215663,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380309,
+          "field_name": "Приоритет",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Р1 — Срочно",
+              "enum_id": 215673,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380311,
+          "field_name": "Направление",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "HSS-STANDARD — стандартный быстрорез / ГОСТ",
+              "enum_id": 215683,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380315,
+          "field_name": "НМЦ",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "19139188"
+            }
+          ]
+        },
+        {
+          "field_id": 380317,
+          "field_name": "Срок подачи",
+          "field_code": null,
+          "field_type": "date",
+          "values": [
+            {
+              "value": 1780855200
+            }
+          ]
+        },
+        {
+          "field_id": 380319,
+          "field_name": "Следующее действие",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "Срочно! Сделать расчёт и КП по 11+ позициям фрез ZPS-FN HSSE-PM (серии 121517, 125517), срок подачи 08.06.2026 16:00"
+            }
+          ]
+        },
+        {
+          "field_id": 380321,
+          "field_name": "Дата следующего действия",
+          "field_code": null,
+          "field_type": "date",
+          "values": [
+            {
+              "value": 1780768800
+            }
+          ]
+        },
+        {
+          "field_id": 380323,
+          "field_name": "Ответственный продажник",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "Сотрудник 2"
+            }
+          ]
+        },
+        {
+          "field_id": 380325,
+          "field_name": "Ответственный закупщик",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "Сотрудник 3"
+            }
+          ]
+        },
+        {
+          "field_id": 380329,
+          "field_name": "Нужна закупка / расчёт",
+          "field_code": null,
+          "field_type": "checkbox",
+          "values": [
+            {
+              "value": true
+            }
+          ]
+        },
+        {
+          "field_id": 380343,
+          "field_name": "Архивное назначение LLM",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Архив — направления / HSS ГОСТ",
+              "enum_id": 215763,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380349,
+          "field_name": "LLM confidence",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "0.95"
+            }
+          ]
+        },
+        {
+          "field_id": 380351,
+          "field_name": "LLM comment",
+          "field_code": null,
+          "field_type": "textarea",
+          "values": [
+            {
+              "value": "Закрытый запрос котировок на поставку 11 позиций концевых фрез ZPS-FN HSSE-PM (серии 121517, 125517). Заказчик — АО КБП Шипунова (ОПК, Тула). НМЦ ~19.1 млн руб. Срок подачи 08.06.2026 — СРОЧНО (2 дня). Допускается эквивалент. Стандартный каталожный инструмент, не спецзаказ по чертежам. Направление: HSS-STANDARD."
+            }
+          ]
+        },
+        {
+          "field_id": 380337,
+          "field_name": "Решение дилера",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Выходим на торги",
+              "enum_id": 215723,
+              "enum_code": null
+            }
+          ]
+        }
+      ],
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3111945?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": [
+        {
+          "id": 3842863,
+          "entity_id": 3111945,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1780875075,
+          "updated_at": 1780875075,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "ТЕНДЕР: 0201-2026-02391 Поставка фрез\nОрганизатор: АО НПО &quot;Высокоточные комплексы&quot; (d.gayday@npovk.ru, Гайдай Дарья Михайловна)\nЗаказчик: АО КБП им. академика А.Г. Шипунова, г. Тула\n\n⏰ СРОК ПОДАЧИ: 08.06.2026, 16:00 МСК\n Рассмотрение заявок: 17.06.2026\n Подведение итогов: 22.06.2026\n\n НМЦ: 19 139 188,29 руб.\n Обеспечение заявки: 95 695,94 руб.\n Место поставки: 300004, Тульская обл., г. Тула, ул. Щегловская Засека, д. 31Б\n\n ПОЗИЦИИ (11 шт, все — фрезы ZPS-FN HSSE-PM, покрытие AlTiN):\n1. 120518.130 HSSCo8 — 6 шт — 20 406 руб.\n2. 121517.060 HSSE-PM — 70 шт — 269 011 руб.\n3. 121517.080 HSSE-PM — 70 шт — 335 509 руб.\n4. 121517.100 HSSE-PM — 70 шт — 397 294 руб.\n5. 121517.120 HSSE-PM — 60 шт — 406 832 руб.\n6. 121517.140 HSSE-PM — 50 шт — 394 780 руб.\n7. 121517.160 HSSE-PM — 70 шт — 654 660 руб.\n8. 121517.180 HSSE-PM — 60 шт — 683 057 руб.\n9. 121517.160 HSSE-PM — 70 шт — 904 291 руб.\n10. 125517.200 HSSE-PM — 60 шт — 1 129 589 руб.\n11. 125517.320 HSSE-PM — 20 шт — 869 188 руб.\n\n✅ Допускается эквивалент\n⚠️ Запрет иностранных товаров (кроме разрешённых исключений)\n️ Закупка для обеспечения обороны страны"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3111945/notes/3842863?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3842909,
+          "entity_id": 3111945,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1780876638,
+          "updated_at": 1780876638,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "⚔️ Выходим на торги!\n Что делать: контролировать ход торгов, зафиксировать результат.\n➡️ Дальше: после торгов — переведи в «К архивированию» и заполни: «Причина закрытия» (Выиграли / Проиграли / Не участвовали) и «Архивное назначение итоговое»."
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3111945/notes/3842909?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3842971,
+          "entity_id": 3111945,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1780878105,
+          "updated_at": 1780878105,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "⚔️ Торги! После результата → архив.\n────────────────────────────────────\n Контролировать ход торгов, зафиксировать результат.\n➡️ После торгов → «К архивированию»\n   Заполни: «Причина закрытия» + «Архивное назначение итоговое»"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3111945/notes/3842971?limit=250&page=1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3156121,
+      "name": "Р2 / НПО Высокоточные комплексы / Gesac 86 поз. / 6.7 млн",
+      "price": 6719076,
+      "price_with_minor_units": 6719076.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": 86357674,
+      "pipeline_id": 10984442,
+      "loss_reason_id": null,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1781017388,
+      "updated_at": 1781017392,
+      "closed_at": null,
+      "closest_task_at": 1781190190,
+      "is_deleted": false,
+      "custom_fields_values": [
+        {
+          "field_id": 380299,
+          "field_name": "Заказчик",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "АО «НПО «Высокоточные комплексы»"
+            }
+          ]
+        },
+        {
+          "field_id": 380305,
+          "field_name": "Тип ситуации",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок / реальные торги",
+              "enum_id": 215657,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380309,
+          "field_name": "Приоритет",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Р2 — Быстрые Деньги",
+              "enum_id": 215675,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380311,
+          "field_name": "Направление",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "CARBIDE-STANDARD — стандартный твердосплав",
+              "enum_id": 215685,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380315,
+          "field_name": "НМЦ",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "6719075.91"
+            }
+          ]
+        },
+        {
+          "field_id": 380317,
+          "field_name": "Срок подачи",
+          "field_code": null,
+          "field_type": "date",
+          "values": [
+            {
+              "value": 1781028000
+            }
+          ]
+        },
+        {
+          "field_id": 380293,
+          "field_name": "Источник",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Тендерная площадка",
+              "enum_id": 215645,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380307,
+          "field_name": "Тип процедуры",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок",
+              "enum_id": 215663,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380303,
+          "field_name": "Номер процедуры",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "SP26061000158"
+            }
+          ]
+        },
+        {
+          "field_id": 380349,
+          "field_name": "LLM confidence",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "0.97"
+            }
+          ]
+        },
+        {
+          "field_id": 380351,
+          "field_name": "LLM comment",
+          "field_code": null,
+          "field_type": "textarea",
+          "values": [
+            {
+              "value": "Закрытый запрос котировок. 86 позиций стандартного каталожного твердосплава Gesac (71 сверло, 13 фрез, 1 корпус фрезы, 1 пластина). НМЦ 6 719 075,91 руб. Эквивалент допускается. Нет ГИСП/ЕПОЗ. Совпадение с ассортиментом >96%. Срок поставки 90 дней. Дедлайн подачи 10.06.2026."
+            }
+          ]
+        },
+        {
+          "field_id": 380319,
+          "field_name": "Следующее действие",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "Рассчитать себестоимость, подготовить КП"
+            }
+          ]
+        },
+        {
+          "field_id": 380329,
+          "field_name": "Нужна закупка / расчёт",
+          "field_code": null,
+          "field_type": "checkbox",
+          "values": [
+            {
+              "value": true
+            }
+          ]
+        }
+      ],
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": [
+        {
+          "id": 3939097,
+          "entity_id": 3156121,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781017396,
+          "updated_at": 1781017396,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "LLM-классификатор (эмуляция)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nПриоритет: Р2\nНаправление: CARBIDE-STANDARD\nПодтип: каталожный твердосплав без ГИСП, возможен аналог (CARB-02)\nТип ситуации: Запрос котировок / реальные торги\nЗаказчик: АО «НПО «Высокоточные комплексы»\nНМЦ: 6 719 075,91 руб.\nНомер процедуры: SP26061000158\nУверенность: 0.97\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nКомментарий: Закрытый запрос котировок. 86 позиций стандартного каталожного твердосплава Gesac (71 сверло, 13 фрез, 1 корпус фрезы, 1 пластина). НМЦ 6 719 075,91 руб. Эквивалент допускается. Нет ГИСП/ЕПОЗ. Совпадение с ассортиментом &gt;96%. Срок поставки 90 дней. Дедлайн подачи 10.06.2026.\n\nМаршрутизация: Р2 + Реальные торги → Статус 5 (Передано в закупку) → Сотрудник 3\n\nФайлы тендера:\n- 0201-2026-00592 Поставка инструментов — Закупка вх.№193679.pdf\n- ИоЗ.docx\n- ИоЗ_Приложение№1_Проектдоговора.doc\n- ИоЗ_Приложение№2_Требованиякпродукции.doc.docx\n- ИоЗ_Приложение№3_ОбоснованиеНМЦ.doc\n- Приложение№1кдоговору.doc\n- Техническое предложение (Форма4).xlsx"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939097?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3939839,
+          "entity_id": 3156121,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781019330,
+          "updated_at": 1781019330,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "Обнаружен и обработан дубль: #3153625\n\nДубль перенесён в архив (воронка Направления → Дубли).\nЭта карточка является основной.\n\nДедупликация: 09.06.2026 15:35"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939839?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3939847,
+          "entity_id": 3156121,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781019362,
+          "updated_at": 1781019362,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "Обнаружен и обработан дубль: #3153625\n\nДубль перенесён в архив (воронка Направления → Дубли).\nЭта карточка является основной.\n\nДедупликация: 09.06.2026 15:36"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3156121/notes/3939847?limit=250&page=1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3153625,
+      "name": "Р2 / КБП (Ростех) / Gesac 86 поз. / 6.7 млн",
+      "price": 6719076,
+      "price_with_minor_units": 6719076.0,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "status_id": 86357722,
+      "pipeline_id": 10984454,
+      "loss_reason_id": null,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1781010549,
+      "updated_at": 1781019360,
+      "closed_at": null,
+      "closest_task_at": 1781183379,
+      "is_deleted": false,
+      "custom_fields_values": [
+        {
+          "field_id": 380299,
+          "field_name": "Заказчик",
+          "field_code": null,
+          "field_type": "text",
+          "values": [
+            {
+              "value": "АО «КБП» (Ростех)"
+            }
+          ]
+        },
+        {
+          "field_id": 380305,
+          "field_name": "Тип ситуации",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок / реальные торги",
+              "enum_id": 215657,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380309,
+          "field_name": "Приоритет",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Р2 — Быстрые Деньги",
+              "enum_id": 215675,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380311,
+          "field_name": "Направление",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "CARBIDE-STANDARD — стандартный твердосплав",
+              "enum_id": 215685,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380315,
+          "field_name": "НМЦ",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "6719075.91"
+            }
+          ]
+        },
+        {
+          "field_id": 380317,
+          "field_name": "Срок подачи",
+          "field_code": null,
+          "field_type": "date",
+          "values": [
+            {
+              "value": 1788717600
+            }
+          ]
+        },
+        {
+          "field_id": 380293,
+          "field_name": "Источник",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Другое",
+              "enum_id": 215653,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380349,
+          "field_name": "LLM confidence",
+          "field_code": null,
+          "field_type": "numeric",
+          "values": [
+            {
+              "value": "0.95"
+            }
+          ]
+        },
+        {
+          "field_id": 380351,
+          "field_name": "LLM comment",
+          "field_code": null,
+          "field_type": "textarea",
+          "values": [
+            {
+              "value": "Закрытый запрос котировок от КБП (Ростех). 86 позиций стандартного твердосплава Gesac. Сумма ~6.7 млн руб. Срок поставки 90 дней."
+            }
+          ]
+        },
+        {
+          "field_id": 380307,
+          "field_name": "Тип процедуры",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Запрос котировок",
+              "enum_id": 215663,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380343,
+          "field_name": "Архивное назначение LLM",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Архив — направления / Дубли / мусор",
+              "enum_id": 215771,
+              "enum_code": null
+            }
+          ]
+        },
+        {
+          "field_id": 380341,
+          "field_name": "Причина закрытия",
+          "field_code": null,
+          "field_type": "select",
+          "values": [
+            {
+              "value": "Дубль",
+              "enum_id": 215757,
+              "enum_code": null
+            }
+          ]
+        }
+      ],
+      "score": null,
+      "account_id": 33089674,
+      "labor_cost": null,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/leads/3153625?limit=250&page=1&with=contacts"
+        }
+      },
+      "_embedded": {
+        "tags": [],
+        "companies": [],
+        "contacts": []
+      },
+      "_notes": [
+        {
+          "id": 3933871,
+          "entity_id": 3153625,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781010555,
+          "updated_at": 1781010555,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "LLM-классификатор (эмуляция)\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n Приоритет: Р2\n Направление: CARBIDE-STANDARD\n️ Тип ситуации: Запрос котировок / реальные торги\n Заказчик: АО «КБП» (Ростех)\n НМЦ: 6 719 075,91 руб.\n Уверенность: 0.95\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n Комментарий: Закрытый запрос котировок от КБП (Ростех). 86 позиций стандартного твердосплава Gesac. Сумма ~6.7 млн руб. Срок поставки 90 дней.\n\n Источник: Яндекс.Диск / ТОРГИ / 09.06.2026 / Gesac - 86 поз.\n Файлы: ИоЗ.docx, Приложение №1 (проект договора), Приложение №3 (обоснование НМЦ), Gesac-86pos_RU.xlsx\n\n➡️ Маршрутизация: Р2 + Реальные торги → Статус 5 (Передано в закупку)"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3153625/notes/3933871?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3939835,
+          "entity_id": 3153625,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781019325,
+          "updated_at": 1781019325,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "⚠️ ДУБЛЬ — основная карточка: #3156121\n\nЭта сделка является дублем. Основная (актуальная) карточка:\nhttps://tokutools.amocrm.ru/leads/detail/3156121\n\nПричина: при ручной эмуляции LLM-классификатора не была выполнена проверка на дубли. Исправлено — добавлена 3-уровневая дедупликация.\n\nПеренесено в архив (дубли): 09.06.2026 15:35"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3153625/notes/3939835?limit=250&page=1"
+            }
+          }
+        },
+        {
+          "id": 3939845,
+          "entity_id": 3153625,
+          "created_by": 0,
+          "updated_by": 0,
+          "created_at": 1781019358,
+          "updated_at": 1781019358,
+          "responsible_user_id": 13902646,
+          "group_id": 0,
+          "note_type": "common",
+          "params": {
+            "text": "⚠️ ДУБЛЬ — основная карточка: #3156121\n\nЭта сделка является дублем. Основная (актуальная) карточка:\nhttps://tokutools.amocrm.ru/leads/detail/3156121\n\nПричина: при ручной эмуляции LLM-классификатора не была выполнена проверка на дубли. Исправлено — добавлена 3-уровневая дедупликация.\n\nПеренесено в архив (дубли): 09.06.2026 15:35"
+          },
+          "account_id": 33089674,
+          "_links": {
+            "self": {
+              "href": "https://tokutools.amocrm.ru/api/v4/leads/3153625/notes/3939845?limit=250&page=1"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": 1059493,
+      "created_by": 13902646,
+      "updated_by": 13902646,
+      "created_at": 1780837425,
+      "updated_at": 1780837425,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "entity_id": 3106185,
+      "entity_type": "leads",
+      "duration": 1800,
+      "is_completed": false,
+      "task_type_id": 1,
+      "text": "Планируются торги на 13.06.2026 - уточнить НМЦ?",
+      "result": [],
+      "complete_till": 1781335800,
+      "account_id": 33089674,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/tasks/1059493?limit=250&page=1"
+        }
+      }
+    },
+    {
+      "id": 1061573,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1780875069,
+      "updated_at": 1780875069,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "entity_id": 3111945,
+      "entity_type": "leads",
+      "duration": 0,
+      "is_completed": false,
+      "task_type_id": 2,
+      "text": "СРОЧНО! Сделать расчёт и КП по 11 позициям фрез ZPS-FN HSSE-PM (серии 121517, 125517). Срок подачи заявки: 08.06.2026 16:00. Заказчик: АО КБП Шипунова (Тула). НМЦ: 19.1 млн руб. Допускается эквивалент.",
+      "result": [],
+      "complete_till": 1780837200,
+      "account_id": 33089674,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/tasks/1061573?limit=250&page=1"
+        }
+      }
+    },
+    {
+      "id": 1092647,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1781010581,
+      "updated_at": 1781010581,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "entity_id": 3153625,
+      "entity_type": "leads",
+      "duration": 0,
+      "is_completed": false,
+      "task_type_id": 1,
+      "text": "Рассчитать себестоимость, подготовить КП. Проверить наличие у поставщиков.\n\nТендер: Gesac 86 позиций (свёрла, фрезы, пластины)\nНМЦ: 6 719 075,91 руб.\nЗаказчик: АО КБП (Ростех)\nСрок поставки: 90 дней с момента договора\nФайлы: Яндекс.Диск / ТОРГИ / 09.06.2026 / Gesac - 86 поз.",
+      "result": [],
+      "complete_till": 1781183379,
+      "account_id": 33089674,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/tasks/1092647?limit=250&page=1"
+        }
+      }
+    },
+    {
+      "id": 1094559,
+      "created_by": 0,
+      "updated_by": 0,
+      "created_at": 1781017392,
+      "updated_at": 1781017392,
+      "responsible_user_id": 13902646,
+      "group_id": 0,
+      "entity_id": 3156121,
+      "entity_type": "leads",
+      "duration": 0,
+      "is_completed": false,
+      "task_type_id": 1,
+      "text": "Рассчитать себестоимость, подготовить КП. Проверить наличие у поставщиков.\n\nТендер: 0201-2026-00592 Поставка инструментов (Gesac 86 поз.)\nНМЦ: 6 719 075,91 руб.\nЗаказчик: АО «НПО «Высокоточные комплексы» (Ростех)\nСрок подачи: 10.06.2026 16:00\nСрок поставки: 90 дней с момента договора\nНомер процедуры: SP26061000158\n\nЭквивалент допускается. Нет ГИСП/ЕПОЗ.\n71 сверло + 13 фрез + 1 корпус + 1 пластина (Gesac).",
+      "result": [],
+      "complete_till": 1781190190,
+      "account_id": 33089674,
+      "_links": {
+        "self": {
+          "href": "https://tokutools.amocrm.ru/api/v4/tasks/1094559?limit=250&page=1"
+        }
+      }
+    }
+  ]
+}
