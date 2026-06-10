@@ -143,12 +143,12 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-    # Каждый час в :30 — сканирование Яндекс.Диска
+    # Каждые 5 минут — сканирование Яндекс.Диска
     scheduler.add_job(
         _job_yadisk_scan,
-        CronTrigger(minute=30),
+        IntervalTrigger(minutes=5),
         id="yadisk_scan",
-        name="Сканирование Яндекс.Диска (новые тендеры)",
+        name="Сканирование Яндекс.Диска (каждые 5 мин)",
         replace_existing=True,
     )
 
