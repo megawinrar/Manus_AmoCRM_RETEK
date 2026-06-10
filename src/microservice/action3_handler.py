@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Регулярки для поиска ссылки на Я.Диск
 # Поддерживает как публичные ссылки (yadi.sk/d/..., disk.yandex.ru/d/...), так и внутренние пути (disk:/ТОРГИ/...)
 YADISK_PUBLIC_LINK_RE = re.compile(r'https?://(?:disk\.yandex\.[a-z]{2,3}|yadi\.sk)/d/[a-zA-Z0-9_-]+')
-YADISK_PATH_RE = re.compile(r'(?:disk:)?(/ТОРГИ/[^\s\n\r]+)')
+YADISK_PATH_RE = re.compile(r'(?:disk:)?(/ТОРГИ/[^\n\r]+?)\s*$', re.MULTILINE)
 
 # Вспомогательные константы для полей из config
 FIELD_CUSTOMER = int(os.getenv("FIELD_CUSTOMER", "380299"))
@@ -220,7 +220,7 @@ def run_extraction_and_classification(files: List[str]) -> Dict[str, Any]:
         logger.error(f"Extraction error: {e}", exc_info=True)
         return {"error": str(e)}
 
-async def process_action3(lead_id: int, note_text: str) -> bool:
+def process_action3(lead_id: int, note_text: str) -> bool:
     """
     Основная функция Действия 3.
     1. Ищет ссылку
@@ -296,17 +296,33 @@ async def process_action3(lead_id: int, note_text: str) -> bool:
         if direction and direction in ENUM_DIRECTION:
             fields_payload.append({"field_id": FIELD_DIRECTION, "values": [{"enum_id": ENUM_DIRECTION[direction]}]})
         if procedure_number:
-            fields_payload.append({"field_id": FIELD_PROCEDURE_NUM, "values": [{"value": procedure_number}]})
+            # FIELD_PROCEDURE_NUM is numeric in amoCRM - only send if convertible to int
+            proc_str = re.sub(r'[^\d]', '', str(procedure_number).strip())
+            if proc_str:
+                fields_payload.append({"field_id": FIELD_PROCEDURE_NUM, "values": [{"value": int(proc_str)}]})
+            else:
+                logger.warning(f"procedure_number '{procedure_number}' is not numeric, skipping field")
         if priority and priority in ENUM_PRIORITY:
             fields_payload.append({"field_id": FIELD_PRIORITY, "values": [{"enum_id": ENUM_PRIORITY[priority]}]})
             
         if confidence:
-            fields_payload.append({"field_id": FIELD_LLM_CONFIDENCE, "values": [{"value": json.dumps(confidence, ensure_ascii=False)}]})
+            # FIELD_LLM_CONFIDENCE is NUMERIC in amoCRM - send average score as 0-100
+            if isinstance(confidence, dict):
+                scores = [v for v in confidence.values() if isinstance(v, (int, float))]
+                avg_score = int(sum(scores) / len(scores) * 100) if scores else 0
+            elif isinstance(confidence, (int, float)):
+                avg_score = int(confidence * 100)
+            else:
+                avg_score = 0
+            fields_payload.append({"field_id": FIELD_LLM_CONFIDENCE, "values": [{"value": avg_score}]})
             
+        # Detailed confidence goes into the comment field (TEXT type)
+        confidence_detail = json.dumps(confidence, ensure_ascii=False) if confidence else ""
         enrichment_comment = (
             f"[ОБОГАЩЕНИЕ ЧЕРЕЗ ЧАТ {datetime.now().strftime('%d.%m.%Y %H:%M')}]\n"
             f"Валидация: {parsed.get('validation_status', 'unknown')}\n"
-            f"Файлов обработано: {len(all_files)}"
+            f"Файлов обработано: {len(all_files)}\n"
+            f"Уверенность: {confidence_detail}"
         )
         fields_payload.append({"field_id": FIELD_LLM_COMMENT, "values": [{"value": enrichment_comment}]})
         
@@ -347,6 +363,7 @@ async def process_action3(lead_id: int, note_text: str) -> bool:
             patch_data["name"] = new_name
             
         # Отправляем PATCH
+        logger.info(f"Action3 patch_data for lead {lead_id}: {json.dumps(patch_data, ensure_ascii=False, default=str)[:500]}")
         client.update_lead(lead_id, patch_data)
         
         # 5. Заметка с результатами

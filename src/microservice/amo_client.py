@@ -90,9 +90,12 @@ class AmoClient:
             except requests.exceptions.Timeout:
                 logger.warning(f"Timeout (attempt {attempt+1}/{retries})")
                 time.sleep(5)
-            except requests.exceptions.ConnectionError:
-                logger.warning(f"Connection error (attempt {attempt+1}/{retries})")
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"Connection error (attempt {attempt+1}/{retries}): {e}")
                 time.sleep(10)
+            except Exception as e:
+                logger.error(f"Unexpected error in _request {method} {endpoint} (attempt {attempt+1}/{retries}): {type(e).__name__}: {e}")
+                time.sleep(3)
 
         logger.error(f"All {retries} attempts failed for {method} {endpoint}")
         return None
@@ -118,9 +121,9 @@ class AmoClient:
             params["filter[statuses][0][status_id]"] = status_id
 
         r = self._request("GET", "leads", params=params)
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json().get("_embedded", {}).get("leads", [])
-        if r and r.status_code == 204:
+        if r is not None and r.status_code == 204:
             return []  # Нет данных
         return []
 
@@ -147,7 +150,7 @@ class AmoClient:
     def get_lead(self, lead_id: int) -> Optional[dict]:
         """Получить одну сделку по ID."""
         r = self._request("GET", f"leads/{lead_id}", params={"with": "custom_fields_values"})
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json()
         return None
 
@@ -158,10 +161,10 @@ class AmoClient:
             return {"id": 0, "_dry_run": True}
 
         r = self._request("POST", "leads", data=[lead_data])
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             leads = r.json().get("_embedded", {}).get("leads", [])
             return leads[0] if leads else None
-        logger.error(f"Ошибка создания сделки: {r.status_code if r else 'NO_RESPONSE'}")
+        logger.error(f"Ошибка создания сделки: {r.status_code if r is not None else 'NO_RESPONSE'}")
         return None
 
     def update_lead(self, lead_id: int, update_data: dict) -> bool:
@@ -171,13 +174,15 @@ class AmoClient:
             return True
 
         update_data["id"] = lead_id
+        logger.info(f"update_lead {lead_id}: sending PATCH with {len(update_data)} fields")
         r = self._request("PATCH", "leads", data=[update_data])
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
+            logger.info(f"update_lead {lead_id}: SUCCESS")
             return True
         logger.error(
             f"Ошибка обновления сделки {lead_id}: "
-            f"{r.status_code if r else 'NO_RESPONSE'} "
-            f"{r.text[:200] if r else ''}"
+            f"{r.status_code if r is not None else 'NO_RESPONSE'} "
+            f"{r.text[:200] if r is not None else ''}"
         )
         return False
 
@@ -225,11 +230,11 @@ class AmoClient:
             return {"id": 0, "_dry_run": True}
 
         r = self._request("POST", "tasks", data=[task_data])
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             tasks = r.json().get("_embedded", {}).get("tasks", [])
             return tasks[0] if tasks else None
         logger.error(
-            f"Ошибка создания задачи: {r.status_code if r else 'NO_RESPONSE'}"
+            f"Ошибка создания задачи: {r.status_code if r is not None else 'NO_RESPONSE'}"
         )
         return None
 
@@ -262,7 +267,7 @@ class AmoClient:
             return {"id": 0, "_dry_run": True}
 
         r = self._request("POST", "tasks", data=[task_data])
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             tasks = r.json().get("_embedded", {}).get("tasks", [])
             return tasks[0] if tasks else None
         return None
@@ -274,7 +279,7 @@ class AmoClient:
             "filter[entity_type]": "leads",
         }
         r = self._request("GET", "tasks", params=params)
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json().get("_embedded", {}).get("tasks", [])
         return []
 
@@ -285,7 +290,7 @@ class AmoClient:
             "order[complete_till]": "asc",
         }
         r = self._request("GET", "tasks", params=params)
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             tasks = r.json().get("_embedded", {}).get("tasks", [])
             now = int(time.time())
             return [t for t in tasks if t.get("complete_till", 0) < now]
@@ -314,11 +319,11 @@ class AmoClient:
             return {"id": 0, "_dry_run": True}
 
         r = self._request("POST", f"leads/{lead_id}/notes", data=[note_data])
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             notes = r.json().get("_embedded", {}).get("notes", [])
             return notes[0] if notes else None
         logger.error(
-            f"Ошибка добавления примечания: {r.status_code if r else 'NO_RESPONSE'}"
+            f"Ошибка добавления примечания: {r.status_code if r is not None else 'NO_RESPONSE'}"
         )
         return None
 
@@ -356,7 +361,7 @@ class AmoClient:
     def get_users(self) -> list[dict]:
         """Получить список пользователей аккаунта."""
         r = self._request("GET", "users")
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json().get("_embedded", {}).get("users", [])
         return []
 
@@ -365,7 +370,7 @@ class AmoClient:
     def get_pipelines(self) -> list[dict]:
         """Получить все воронки с их статусами."""
         r = self._request("GET", "leads/pipelines")
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json().get("_embedded", {}).get("pipelines", [])
         return []
 
@@ -385,16 +390,16 @@ class AmoClient:
         # Note: webhooks can also be configured in integration settings
         payload = {"destination": url, "settings": events}
         r = self._request("POST", "webhooks", data=payload)
-        if r and r.status_code in (200, 201):
+        if r is not None and r.status_code in (200, 201):
             return r.json()
         logger.error(
-            f"Ошибка подписки на вебхук: {r.status_code if r else 'NO_RESPONSE'}"
+            f"Ошибка подписки на вебхук: {r.status_code if r is not None else 'NO_RESPONSE'}"
         )
         return None
 
     def list_webhooks(self) -> list[dict]:
         """Получить список активных вебхуков."""
         r = self._request("GET", "webhooks")
-        if r and r.status_code == 200:
+        if r is not None and r.status_code == 200:
             return r.json().get("_embedded", {}).get("webhooks", [])
         return []

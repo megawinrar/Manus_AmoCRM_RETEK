@@ -1,7 +1,7 @@
 # SESSION STATE — RETEK amoCRM Microservice
 
-> Последнее обновление: 10.06.2026 (PATCH18)
-> Коммит: PATCH18 — Действие 3 полностью: action3_handler.py + защита от цикла
+> Последнее обновление: 10.06.2026 (PATCH20)
+> Коммит: PATCH20 — Action 3 E2E работает: 5 багфиксов + 27 тестов
 > Репозиторий: https://github.com/megawinrar/Manus_AmoCRM_RETEK
 
 ---
@@ -44,10 +44,11 @@
 - `field_validator.py` — обязательные поля по статусам, warn/block
 - 4 сценария: дубль / обогащение / обновление / fuzzy-предупреждение
 
-### 6. Тесты — 78 штук (все зелёные)
+### 6. Тесты — 105 штук (все зелёные)
 - test_microservice.py (29)
 - test_deduplication.py (35)
 - test_amo_api.py (14)
+- test_patch20_fixes.py (27) — PATCH20 багфиксы
 
 ### 7. Документация
 - README.md — архитектура, быстрый старт
@@ -176,16 +177,22 @@
 - Выход: customer, nmc, direction, deadline, priority, validation_status, confidence
 - OCR-fallback автоматически для сканированных PDF ✅
 
-**Действие 3 — распознавание из чата amoCRM (PATCH18 — полная реализация):**
-- `action3_handler.py` — полный пайплайн (~380 строк)
+**Действие 3 — распознавание из чата amoCRM (PATCH18-20 — полная реализация, E2E ✅):**
+- `action3_handler.py` — полный пайплайн (~400 строк)
 - **Триггеры:** ссылка на Я.Диск (yadi.sk, disk.yandex.ru, disk:/ПУТЬ) + слова ("распознай", "тендер", "parse", "extract")
-- **Пайплайн:** парсинг ссылки → скачивание с Я.Диска (public API) → распаковка ZIP → extract_and_classify → заполнение полей карточки
-- **Заполняемые поля:** customer, nmc, direction, priority, situation_type, procedure_number, deadline
+- **Пайплайн:** парсинг ссылки → скачивание с Я.Диска (internal API) → распаковка ZIP → extract_and_classify → заполнение полей карточки
+- **Заполняемые поля:** customer, nmc, direction, priority, situation_type, procedure_number, deadline, confidence
 - **Маршрутизация:** resolve_routing(priority, situation) → status_id + responsible_user_id
 - **Название:** `[P{n}] — Заказчик — DD.MM`
 - **Защита от цикла:** фильтр bot_own_note (префиксы 🤖/✅/❌/⚠️ + маркеры)
-- **Тест:** скачивание 101 файла + распознавание прошло ✅
-- **Блокер:** Токен amoCRM истёк (402), обновление карточки не сработало. Ждём ответ поддержки amoCRM
+- **E2E тест (PATCH20):** webhook → скачивание 3 файлов → распознавание → PATCH карточки 200 OK → заметка + задача ✅
+
+**Багфиксы PATCH20 (5 штук):**
+1. `amo_client.py`: `if r` → `if r is not None` (requests.Response.__bool__=False для 4xx)
+2. `action3_handler.py`: FIELD_LLM_CONFIDENCE — отправляем int(avg*100), не JSON-строку
+3. `action3_handler.py`: procedure_number — strip non-digits перед отправкой
+4. `webhook_handler.py`: entity_id (не note_id) для lead_id + run_in_executor (не asyncio.create_task)
+5. `cron_hourly.py`: Unix timestamp → strftime("%d.%m.%Y") перед build_lead_name
 
 ---
 
@@ -195,9 +202,9 @@
 
 | # | Задача | Приоритет | Зависимость |
 |---|---|---|---|
-| 1 | Обновить токен amoCRM (ждём поддержку) | 🔴 | Блокер |
-| 2 | Проверить Действие 3 end-to-end (после токена) | 🔴 | Токен |
-| 3 | **CRM-Audit-Service** — реализовать MVP (см. ниже) | 🔴 | Токен |
+| ~~1~~ | ~~Обновить токен amoCRM~~ | ✅ | Решено (PATCH19) |
+| ~~2~~ | ~~Проверить Действие 3 end-to-end~~ | ✅ | Решено (PATCH20) |
+| 3 | **CRM-Audit-Service** — реализовать MVP (см. ниже) | 🔴 | — |
 | 4 | **Hermes TG Bot** — наблюдатель Телеграм (см. ниже) | 🟡 | После CRM-Audit |
 | 5 | **Управление автоматизацией** — аналитика всех досок (см. ниже) | 🟡 | После CRM-Audit |
 | 6 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |

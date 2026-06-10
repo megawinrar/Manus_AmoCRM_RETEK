@@ -124,10 +124,16 @@ class HourlyControl:
         if not deadline_value:
             return False
 
+        # FIX: amoCRM returns deadline as Unix timestamp (int), convert to date string
+        if isinstance(deadline_value, (int, float)):
+            deadline_str = datetime.fromtimestamp(int(deadline_value)).strftime('%Y-%m-%d')
+        else:
+            deadline_str = str(deadline_value)
+
         # Проверяем эскалацию
         new_priority, escalated, reason = auto_escalate_priority(
             current_priority=priority_value,
-            deadline_str=deadline_value,
+            deadline_str=deadline_str,
         )
 
         if not escalated:
@@ -155,7 +161,7 @@ class HourlyControl:
         new_name = build_lead_name(
             priority_enum_id=new_enum_id,
             customer=customer,
-            deadline_str=deadline_value,
+            deadline_str=deadline_str,
         )
         self.client.update_lead(lead_id, {"name": new_name})
 
@@ -164,7 +170,7 @@ class HourlyControl:
             old_priority=priority_value,
             new_priority=new_priority,
             reason=reason,
-            deadline=deadline_value,
+            deadline=deadline_str,
         )
         self.client.add_note(lead_id, note_text)
 

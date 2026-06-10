@@ -240,11 +240,26 @@ async def _handle_note_add(body: dict) -> dict:
     # Ищем текст примечания в ключах (amoCRM может присылать в разных форматах)
     note_text = ""
     lead_id = None
-    
-    # Поиск lead_id
+
+    # FIX: Поиск lead_id — приоритет element_id/entity_id (это реальный lead_id),
+    # а НЕ notes[add][0][id] (это note_id!)
+    # amoCRM webhook для notes[add] присылает:
+    #   notes[add][0][id] = note_id (ID примечания)
+    #   notes[add][0][entity_id] = lead_id (ID сделки)
+    #   notes[add][0][element_id] = lead_id (альтернативное имя)
     for k, v in body.items():
-        if "[element_id]" in k or "[lead_id]" in k or k.endswith("[id]"):
+        if "[entity_id]" in k or "[element_id]" in k:
             if "note" in k or "notes" in k:
+                try:
+                    lead_id = int(v)
+                    break
+                except ValueError:
+                    pass
+
+    # Фоллбэк: leads[note][0][id] (старый формат amoCRM)
+    if not lead_id:
+        for k, v in body.items():
+            if "leads[note][0][id]" in k:
                 try:
                     lead_id = int(v)
                 except ValueError:
@@ -257,15 +272,6 @@ async def _handle_note_add(body: dict) -> dict:
             note_text_original = str(v)
             break
     note_text = note_text_original.lower()
-            
-    if not lead_id:
-        # Альтернативный поиск lead_id
-        for k, v in body.items():
-            if "leads[note][0][id]" in k or "notes[add][0][element_id]" in k:
-                try:
-                    lead_id = int(v)
-                except ValueError:
-                    pass
 
     if not lead_id:
         return {"status": "ignored", "reason": "cannot_find_lead_id_in_note"}
@@ -293,9 +299,11 @@ async def _handle_note_add(body: dict) -> dict:
         logger.info(f"Action 3 triggered for lead {lead_id}, link={link}")
         
         if link:
-            # Запускаем обработку в фоне, чтобы не блокировать вебхук
+            # Запускаем обработку в отдельном потоке, чтобы не блокировать event loop
             import asyncio
-            asyncio.create_task(process_action3(lead_id, note_text_original))
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, process_action3, lead_id, note_text_original)
             return {"status": "ok", "action": "action3_started", "lead_id": lead_id}
         else:
             client = get_amo_client()
