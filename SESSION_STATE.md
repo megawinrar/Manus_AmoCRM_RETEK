@@ -1,7 +1,7 @@
 # SESSION STATE — RETEK amoCRM Microservice
 
-> Последнее обновление: 10.06.2026 (PATCH17)
-> Коммит: PATCH17 — Webhook amoCRM + extract_and_classify в cron + Действие 3
+> Последнее обновление: 10.06.2026 (PATCH18)
+> Коммит: PATCH18 — Действие 3 полностью: action3_handler.py + защита от цикла
 > Репозиторий: https://github.com/megawinrar/Manus_AmoCRM_RETEK
 
 ---
@@ -176,12 +176,16 @@
 - Выход: customer, nmc, direction, deadline, priority, validation_status, confidence
 - OCR-fallback автоматически для сканированных PDF ✅
 
-**Действие 3 — распознавание из чата amoCRM:**
-- `webhook_handler.py` обрабатывает `notes[add]` / `leads[note]` / `note[add]`
-- Триггер-слова: "распознай", "парсинг", "parse", "extract", "тендер"
-- Ответ в ленту карточки: "🤖 Принял команду..."
-- Тест пройдён: `action3_triggered` ✅
-- TODO: скачать файлы из сделки и запустить extract_and_classify (следующая сессия)
+**Действие 3 — распознавание из чата amoCRM (PATCH18 — полная реализация):**
+- `action3_handler.py` — полный пайплайн (~380 строк)
+- **Триггеры:** ссылка на Я.Диск (yadi.sk, disk.yandex.ru, disk:/ПУТЬ) + слова ("распознай", "тендер", "parse", "extract")
+- **Пайплайн:** парсинг ссылки → скачивание с Я.Диска (public API) → распаковка ZIP → extract_and_classify → заполнение полей карточки
+- **Заполняемые поля:** customer, nmc, direction, priority, situation_type, procedure_number, deadline
+- **Маршрутизация:** resolve_routing(priority, situation) → status_id + responsible_user_id
+- **Название:** `[P{n}] — Заказчик — DD.MM`
+- **Защита от цикла:** фильтр bot_own_note (префиксы 🤖/✅/❌/⚠️ + маркеры)
+- **Тест:** скачивание 101 файла + распознавание прошло ✅
+- **Блокер:** Токен amoCRM истёк (402), обновление карточки не сработало. Ждём ответ поддержки amoCRM
 
 ---
 
@@ -191,10 +195,11 @@
 
 | # | Задача | Приоритет | Зависимость |
 |---|---|---|---|
-| 1 | Действие 3 — скачать файлы из сделки и запустить extract_and_classify | 🔴 | — |
-| 2 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
-| 3 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
-| 4 | RAG чат в карточке amoCRM | 🟢 | Будущее |
+| 1 | Обновить токен amoCRM (ждём поддержку) | 🔴 | Блокер |
+| 2 | Проверить Действие 3 end-to-end (после токена) | 🔴 | Токен |
+| 3 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
+| 4 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
+| 5 | RAG чат в карточке amoCRM | 🟢 | Будущее |
 
 ---
 
@@ -215,7 +220,7 @@
 
 | Сервис | Статус |
 |---|---|
-| amoCRM JWT | ✅ Работает (до 29.07.2026) |
+| amoCRM JWT | ❌ Истёк (402). Ждём поддержку amoCRM |
 | Яндекс.Диск OAuth | ✅ Работает |
 | Яндекс GPT API | ✅ Работает (ключ в .env) |
 | Yandex Embeddings | ✅ Работает (256 dim) |

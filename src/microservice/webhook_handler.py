@@ -250,11 +250,13 @@ async def _handle_note_add(body: dict) -> dict:
                 except ValueError:
                     pass
 
-    # Поиск текста
+    # Поиск текста (сохраняем оригинальный регистр для парсинга ссылок)
+    note_text_original = ""
     for k, v in body.items():
         if "[text]" in k:
-            note_text = str(v).lower()
+            note_text_original = str(v)
             break
+    note_text = note_text_original.lower()
             
     if not lead_id:
         # Альтернативный поиск lead_id
@@ -270,19 +272,37 @@ async def _handle_note_add(body: dict) -> dict:
 
     logger.info(f"Note added to lead {lead_id}: '{note_text[:50]}'")
 
-    # Триггер: если в тексте есть команда
-    trigger_words = ["распознай", "парсинг", "parse", "extract", "тендер"]
-    if any(word in note_text for word in trigger_words):
-        logger.info(f"Action 3 triggered for lead {lead_id}")
-        client = get_amo_client()
-        client.add_note(lead_id, "🤖 Принял команду на распознавание тендера. Запускаю анализ файлов...")
-        
-        # TODO: Реализовать скачивание файлов из сделки и запуск extract_and_classify
-        # Сейчас мы просто подтверждаем получение команды
-        
-        return {"status": "ok", "action": "action3_triggered", "lead_id": lead_id}
+    # Защита от бесконечного цикла: игнорируем собственные заметки бота
+    bot_prefixes = ["🤖", "✅", "❌", "⚠️", "🎯", "━", "📎"]
+    if any(note_text_original.startswith(p) for p in bot_prefixes):
+        return {"status": "ignored", "reason": "bot_own_note"}
+    # Также игнорируем если текст содержит маркеры бота
+    bot_markers = ["найдена ссылка на яндекс.диск", "скачано файлов", "распознавание завершено", "системная ошибка", "команда распознавания"]
+    if any(m in note_text for m in bot_markers):
+        return {"status": "ignored", "reason": "bot_own_note"}
 
-    return {"status": "ignored", "reason": "no_trigger_word_in_note"}
+    # Триггер: если в тексте есть ссылка на Яндекс.Диск
+    from .action3_handler import extract_yadisk_link, process_action3
+    
+    # Парсим ссылку из ОРИГИНАЛЬНОГО текста (с сохранением регистра)
+    link = extract_yadisk_link(note_text_original)
+    trigger_words = ["распознай", "парсинг", "parse", "extract", "тендер"]
+    has_trigger = any(word in note_text for word in trigger_words)
+    
+    if link or has_trigger:
+        logger.info(f"Action 3 triggered for lead {lead_id}, link={link}")
+        
+        if link:
+            # Запускаем обработку в фоне, чтобы не блокировать вебхук
+            import asyncio
+            asyncio.create_task(process_action3(lead_id, note_text_original))
+            return {"status": "ok", "action": "action3_started", "lead_id": lead_id}
+        else:
+            client = get_amo_client()
+            client.add_note(lead_id, "⚠️ Команда распознавания получена, но ссылка на Яндекс.Диск не найдена. Прикрепите ссылку на папку (disk.yandex.ru/d/... или disk:/ТОРГИ/...).")
+            return {"status": "ok", "action": "action3_missing_link", "lead_id": lead_id}
+
+    return {"status": "ignored", "reason": "no_trigger_word_or_link_in_note"}
 
 
 # ═══════════════════════════════════════════════════════════════════
