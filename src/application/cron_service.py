@@ -4,7 +4,7 @@ Cron background jobs use cases.
 
 import logging
 from src.infrastructure.amocrm_client import AmoClient
-from src.domain.enums import ActiveStatuses, Pipelines
+from src.domain.enums import ActiveStatuses, Fields, Pipelines
 from src.domain.rules import auto_escalate_priority
 
 logger = logging.getLogger(__name__)
