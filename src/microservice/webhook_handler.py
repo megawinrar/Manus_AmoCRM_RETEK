@@ -65,6 +65,9 @@ async def handle_webhook(request: Request):
             return await _handle_status_change(body)
         elif any(k.startswith("leads[add]") for k in body.keys()):
             return await _handle_lead_add(body)
+        elif any(k.startswith("leads[note]") for k in body.keys()) or any(k.startswith("notes[add]") for k in body.keys()) or any(k.startswith("note[add]") for k in body.keys()):
+            # В amoCRM событие называется note_lead, но в POST приходит массив notes[add] или leads[note]
+            return await _handle_note_add(body)
         else:
             logger.debug(f"Unhandled webhook type. Keys: {list(body.keys())[:10]}")
             return {"status": "ignored", "reason": "unhandled_event_type"}
@@ -222,6 +225,64 @@ async def _handle_lead_add(body: dict) -> dict:
     lead_name = body.get("leads[add][0][name]", "?")
     logger.info(f"New lead created: id={lead_id}, name='{lead_name}'")
     return {"status": "ok", "action": "lead_add_logged", "lead_id": lead_id}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ОБРАБОТКА ПРИМЕЧАНИЙ (ДЕЙСТВИЕ 3)
+# ═══════════════════════════════════════════════════════════════════
+
+async def _handle_note_add(body: dict) -> dict:
+    """
+    Обработка добавления примечания/сообщения.
+    Ищет команду на распознавание тендера, например: "распознай" или "extract"
+    и запускает extract_and_classify для файлов в карточке (будущая реализация).
+    """
+    # Ищем текст примечания в ключах (amoCRM может присылать в разных форматах)
+    note_text = ""
+    lead_id = None
+    
+    # Поиск lead_id
+    for k, v in body.items():
+        if "[element_id]" in k or "[lead_id]" in k or k.endswith("[id]"):
+            if "note" in k or "notes" in k:
+                try:
+                    lead_id = int(v)
+                except ValueError:
+                    pass
+
+    # Поиск текста
+    for k, v in body.items():
+        if "[text]" in k:
+            note_text = str(v).lower()
+            break
+            
+    if not lead_id:
+        # Альтернативный поиск lead_id
+        for k, v in body.items():
+            if "leads[note][0][id]" in k or "notes[add][0][element_id]" in k:
+                try:
+                    lead_id = int(v)
+                except ValueError:
+                    pass
+
+    if not lead_id:
+        return {"status": "ignored", "reason": "cannot_find_lead_id_in_note"}
+
+    logger.info(f"Note added to lead {lead_id}: '{note_text[:50]}'")
+
+    # Триггер: если в тексте есть команда
+    trigger_words = ["распознай", "парсинг", "parse", "extract", "тендер"]
+    if any(word in note_text for word in trigger_words):
+        logger.info(f"Action 3 triggered for lead {lead_id}")
+        client = get_amo_client()
+        client.add_note(lead_id, "🤖 Принял команду на распознавание тендера. Запускаю анализ файлов...")
+        
+        # TODO: Реализовать скачивание файлов из сделки и запуск extract_and_classify
+        # Сейчас мы просто подтверждаем получение команды
+        
+        return {"status": "ok", "action": "action3_triggered", "lead_id": lead_id}
+
+    return {"status": "ignored", "reason": "no_trigger_word_in_note"}
 
 
 # ═══════════════════════════════════════════════════════════════════

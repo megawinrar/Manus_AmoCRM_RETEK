@@ -758,21 +758,48 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                 })
                 continue
 
-            # ─── LLM Классификация ───────────────────────────────
+            # ─── Быстрая экстракция + парсинг (вместо медленной LLM) ───────────────
             try:
-                from .llm_classifier import classify_tender
-                result = classify_tender(
-                    folder_name=folder_name,
-                    date_folder=date_folder,
-                    files=all_files,
-                )
+                import sys
+                project_root = Path(__file__).parent.parent.parent
+                scripts_dir = project_root / "scripts"
+                if str(scripts_dir) not in sys.path:
+                    sys.path.append(str(scripts_dir))
+                
+                import extract_and_classify as ec_module
+                
+                # 1. Извлекаем текст из всех файлов
+                all_text = ""
+                for f in all_files:
+                    if os.path.exists(f):
+                        text = ec_module.extract_file(f)
+                        if isinstance(text, tuple):
+                            text = text[0]
+                        all_text += text + "\n"
+                
+                # 2. Парсим поля
+                parsed = ec_module.parse_tender_fields(all_text, all_files)
+                
+                # 3. Валидация + OCR fallback
+                parsed = ec_module.validate_and_fallback(parsed, all_files)
+                
+                # Маппинг результата в старый формат для обратной совместимости
+                result = {
+                    "customer": parsed.get("customer", customer_hint),
+                    "nmc": parsed.get("nmc", 0),
+                    "direction": parsed.get("direction_hint", "CARBIDE-STANDARD"),
+                    "deadline": parsed.get("deadline", ""),
+                    "priority": parsed.get("priority_hint", "P3"),
+                    "validation_status": parsed.get("validation_status", "unknown"),
+                    "confidence": parsed.get("confidence_scores", {})
+                }
 
-                # Сохраняем в dedup DB с данными от LLM
+                # Сохраняем в dedup DB с данными от парсера
                 dedup_db.save_tender(
                     tender_path=folder_path,
                     files=file_records,
-                    customer=result.get("customer", customer_hint),
-                    nmc=result.get("nmc", 0),
+                    customer=result.get("customer"),
+                    nmc=result.get("nmc"),
                     direction=result.get("direction"),
                     date_folder=date_folder,
                 )
@@ -795,8 +822,11 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                     "result": result,
                     "is_fuzzy": dedup_result.is_fuzzy_duplicate,
                 })
+                
+                logger.info(f"  ✅ Парсинг завершён: статус {result['validation_status']}, заказчик {result['customer']}")
 
-            except ImportError:
+            except ImportError as e:
+                logger.error(f"Не удалось импортировать extract_and_classify: {e}")
                 update_tender_status(conn, folder_path, status="awaiting_llm")
                 dedup_db.save_tender(
                     tender_path=folder_path,
@@ -812,7 +842,7 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                 })
 
             except Exception as e:
-                logger.error(f"Ошибка LLM для {folder_name}: {e}")
+                logger.error(f"Ошибка парсинга для {folder_name}: {e}")
                 update_tender_status(conn, folder_path, status="error", error=str(e))
                 stats["errors"] += 1
 

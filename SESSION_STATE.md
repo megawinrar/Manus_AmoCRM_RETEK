@@ -1,7 +1,7 @@
 # SESSION STATE — RETEK amoCRM Microservice
 
-> Последнее обновление: 10.06.2026 (PATCH16)
-> Коммит: PATCH16 — Production деплой на Yandex Cloud VM
+> Последнее обновление: 10.06.2026 (PATCH17)
+> Коммит: PATCH17 — Webhook amoCRM + extract_and_classify в cron + Действие 3
 > Репозиторий: https://github.com/megawinrar/Manus_AmoCRM_RETEK
 
 ---
@@ -164,6 +164,25 @@
 - **Cron-задачи запущены:** 5 задач (APScheduler)
 - **Webhook URL для amoCRM:** `http://89.169.142.160/webhook`
 
+### 17. Интеграция webhook + extract_and_classify + Действие 3 (PATCH17) ✅
+
+**Webhook amoCRM зарегистрирован через API:**
+- ID: 47825646, URL: `http://89.169.142.160/webhook`
+- События: `add_lead`, `update_lead`, `note_lead` ✅
+
+**extract_and_classify.py интегрирован в cron_yadisk.py:**
+- Заменяет медленный LLM-классификатор для новых тендеров
+- Пайплайн: скачать файлы → extract_file() → parse_tender_fields() → validate_and_fallback()
+- Выход: customer, nmc, direction, deadline, priority, validation_status, confidence
+- OCR-fallback автоматически для сканированных PDF ✅
+
+**Действие 3 — распознавание из чата amoCRM:**
+- `webhook_handler.py` обрабатывает `notes[add]` / `leads[note]` / `note[add]`
+- Триггер-слова: "распознай", "парсинг", "parse", "extract", "тендер"
+- Ответ в ленту карточки: "🤖 Принял команду..."
+- Тест пройдён: `action3_triggered` ✅
+- TODO: скачать файлы из сделки и запустить extract_and_classify (следующая сессия)
+
 ---
 
 ## Что НЕ сделано (следующие шаги)
@@ -172,12 +191,10 @@
 
 | # | Задача | Приоритет | Зависимость |
 |---|---|---|---|
-| 1 | **Прописать webhook URL в amoCRM** → `http://89.169.142.160/webhook` | 🔴 | — |
+| 1 | Действие 3 — скачать файлы из сделки и запустить extract_and_classify | 🔴 | — |
 | 2 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
-| 3 | Действие 3 — распознавание из чата amoCRM (webhook на notes[add]) | 🟡 | — |
-| 4 | Интеграция extract_and_classify.py в cron_yadisk (автопарсинг) | 🟡 | — |
-| 5 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
-| 6 | RAG чат в карточке amoCRM | 🟢 | Будущее |
+| 3 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
+| 4 | RAG чат в карточке amoCRM | 🟢 | Будущее |
 
 ---
 
