@@ -1,0 +1,21 @@
+# ═══════════════════════════════════════════════════════════════════
+# Docker ignore — exclude from build context
+# ═══════════════════════════════════════════════════════════════════
+.git
+.gitignore
+.env
+.env.example
+*.md
+tests/
+data/
+backups/
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.venv
+venv
+node_modules
+deploy/
+!deploy/Dockerfile
+!deploy/requirements-deploy.txt

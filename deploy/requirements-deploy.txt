@@ -1,0 +1,16 @@
+# Additional production dependencies (beyond requirements.txt)
+# RAG
+chromadb>=0.4.22
+aiohttp>=3.9.0
+numpy>=1.24.0
+
+# Document extraction
+openpyxl>=3.1.2
+python-docx>=1.1.0
+pytesseract>=0.3.10
+
+# PDF (pdftotext is a system package, python wrapper optional)
+# pdftotext  # installed via poppler-utils system package
+
+# Production
+gunicorn>=21.2.0
