@@ -175,7 +175,7 @@ class HourlyControl:
         self.client.add_note(lead_id, note_text)
 
         # 4. Задача на 2 часа
-        responsible = lead.get("responsible_user_id", Users.EMPLOYEE_3_PURCHASE)
+        responsible = lead.get("responsible_user_id", Users.EMPLOYEE_3_BUYER)
         self.client.create_task(
             lead_id=lead_id,
             text=(
