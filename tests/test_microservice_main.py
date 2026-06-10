@@ -41,7 +41,7 @@ os.environ.setdefault("ARCH_SOZ_30D", "300003")
 os.environ.setdefault("AMO_PIPELINE_ACTIVE_ID", "1")
 os.environ.setdefault("AMO_PIPELINE_ARCHIVE_DIRECTIONS_ID", "2")
 os.environ.setdefault("AMO_PIPELINE_ARCHIVE_SOZ_ID", "3")
-os.environ.setdefault("DRY_RUN", "1")
+os.environ["DRY_RUN"] = "1"
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -51,6 +51,12 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     """Create a test client with mocked scheduler."""
+    # Force DRY_RUN=1 and reload main module to pick it up
+    os.environ["DRY_RUN"] = "1"
+    if "src.microservice.main" in sys.modules:
+        import importlib
+        import src.microservice.main as main_mod
+        importlib.reload(main_mod)
     with patch("src.microservice.main.scheduler") as mock_scheduler:
         mock_scheduler.get_jobs.return_value = []
         mock_scheduler.running = True
