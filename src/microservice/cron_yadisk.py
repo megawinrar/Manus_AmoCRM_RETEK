@@ -79,6 +79,26 @@ AMO_HEADERS = {
 }
 AMO_BASE_URL = f"https://{AMO_DOMAIN}/api/v4"
 
+# amoCRM pipeline/status IDs
+AMO_PIPELINE_ACTIVE = int(os.getenv("AMO_PIPELINE_ACTIVE_ID", "10984442"))
+AMO_STATUS_LLM = int(os.getenv("STATUS_1_LLM", "0"))
+
+# Custom field IDs
+FIELD_CUSTOMER = int(os.getenv("FIELD_CUSTOMER", "380299"))
+FIELD_NMC = int(os.getenv("FIELD_NMC", "380315"))
+FIELD_DEADLINE = int(os.getenv("FIELD_DEADLINE", "380317"))
+FIELD_DIRECTION = int(os.getenv("FIELD_DIRECTION", "380311"))
+FIELD_PRIORITY = int(os.getenv("FIELD_PRIORITY", "380309"))
+FIELD_SOURCE = int(os.getenv("FIELD_SOURCE", "380293"))
+FIELD_DOCS_URL = int(os.getenv("FIELD_DOCS_URL", "380297"))
+FIELD_LLM_CONFIDENCE = int(os.getenv("FIELD_LLM_CONFIDENCE", "380349"))
+FIELD_LLM_COMMENT = int(os.getenv("FIELD_LLM_COMMENT", "380351"))
+FIELD_PROCEDURE_NUM = int(os.getenv("FIELD_PROCEDURE_NUM", "380303"))
+FIELD_SITUATION_TYPE = int(os.getenv("FIELD_SITUATION_TYPE", "380305"))
+
+# User IDs
+AMO_USER_RESPONSIBLE = int(os.getenv("USER_EMPLOYEE_2", "0"))
+
 
 # ═══════════════════════════════════════════════════════════════════
 # SQLITE: ДЕДУПЛИКАЦИЯ (LEGACY)
@@ -521,6 +541,131 @@ def _update_lead_fields(lead_id: int, custom_fields: list[dict]):
         logger.error(f"Ошибка при обновлении полей: {e}")
 
 
+def _create_amo_lead(result: dict, folder_name: str, folder_path: str, date_folder: str) -> Optional[int]:
+    """
+    Создать сделку в amoCRM на основе результатов классификации.
+    Возвращает lead_id или None при ошибке.
+    """
+    if not AMO_TOKEN or not AMO_DOMAIN:
+        logger.warning("AMO_TOKEN/AMO_DOMAIN не заданы — пропускаем создание сделки")
+        return None
+
+    customer = result.get("customer") or folder_name
+    lead_name = f"[YaDisk] {customer}"
+    if len(lead_name) > 200:
+        lead_name = lead_name[:200]
+
+    # Маппинг direction_hint → enum value в amoCRM
+    DIRECTION_ENUM_MAP = {
+        "SPEC-DRAWING": "SPEC-DRAWING \u2014 \u0441\u043f\u0435\u0446\u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442 \u043f\u043e \u0447\u0435\u0440\u0442\u0435\u0436\u0430\u043c / \u0422\u0417",
+        "HSS-STANDARD": "HSS-STANDARD \u2014 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u044b\u0439 \u0431\u044b\u0441\u0442\u0440\u043e\u0440\u0435\u0437 / \u0413\u041e\u0421\u0422",
+        "CARBIDE-STANDARD": "CARBIDE-STANDARD \u2014 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u044b\u0439 \u0442\u0432\u0435\u0440\u0434\u043e\u0441\u043f\u043b\u0430\u0432",
+        "DIAMOND-STANDARD": "DIAMOND-STANDARD \u2014 \u0430\u043b\u043c\u0430\u0437\u043d\u044b\u0439 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442\u043d\u044b\u0439",
+        "SOZ-DEVELOPMENT": "SOZ-DEVELOPMENT \u2014 \u0421\u041e\u0417 / \u0440\u0430\u0437\u0432\u0438\u0442\u0438\u0435 / \u0431\u0443\u0434\u0443\u0449\u0438\u0439 \u0442\u043e\u0440\u0433",
+        "REAL-TENDER": "REAL-TENDER \u2014 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0435 \u0442\u043e\u0440\u0433\u0438 / \u0437\u0430\u043f\u0440\u043e\u0441 \u043a\u043e\u0442\u0438\u0440\u043e\u0432\u043e\u043a",
+        "OUT-OF-SCOPE": "OUT-OF-SCOPE \u2014 \u043d\u0435 \u043d\u0430\u0448 \u0430\u0441\u0441\u043e\u0440\u0442\u0438\u043c\u0435\u043d\u0442",
+        "ARCHIVE-LEAD": "ARCHIVE-LEAD \u2014 \u0431\u0430\u0437\u0430 / \u043d\u0430\u0431\u043b\u044e\u0434\u0435\u043d\u0438\u0435 / \u0431\u0443\u0434\u0443\u0449\u0430\u044f \u043f\u0440\u043e\u0440\u0430\u0431\u043e\u0442\u043a\u0430",
+    }
+    # Маппинг priority → enum value в amoCRM
+    PRIORITY_ENUM_MAP = {
+        "P1": "\u04201 \u2014 \u0421\u0440\u043e\u0447\u043d\u043e",
+        "P2": "\u04202 \u2014 \u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0414\u0435\u043d\u044c\u0433\u0438",
+        "P3": "\u04203 \u2014 \u0421\u0440\u0435\u0434\u043d\u0438\u0435 \u0414\u0435\u043d\u044c\u0433\u0438",
+        "P4": "\u04204 \u2014 \u041d\u0430\u0431\u043b\u044e\u0434\u0430\u0435\u043c / \u0412 \u0431\u0430\u0437\u0443",
+    }
+
+    # Формируем custom_fields_values
+    custom_fields = []
+    # Заказчик (text)
+    if result.get("customer"):
+        custom_fields.append({"field_id": FIELD_CUSTOMER, "values": [{"value": str(result["customer"])[:255]}]})
+    # НМЦ (numeric) — передаём как int
+    if result.get("nmc") and result["nmc"] > 0:
+        custom_fields.append({"field_id": FIELD_NMC, "values": [{"value": int(result["nmc"])}]})
+    # Срок подачи (date) — нужен unix timestamp или строка YYYY-MM-DD
+    if result.get("deadline"):
+        deadline_val = result["deadline"]
+        # Преобразуем DD.MM.YYYY в unix timestamp
+        try:
+            from datetime import datetime as _dt
+            if re.match(r'\d{2}\.\d{2}\.\d{4}', str(deadline_val)):
+                dt = _dt.strptime(str(deadline_val), '%d.%m.%Y')
+                deadline_val = int(dt.timestamp())
+            elif re.match(r'\d{4}-\d{2}-\d{2}', str(deadline_val)):
+                dt = _dt.strptime(str(deadline_val), '%Y-%m-%d')
+                deadline_val = int(dt.timestamp())
+        except Exception:
+            deadline_val = None
+        if deadline_val:
+            custom_fields.append({"field_id": FIELD_DEADLINE, "values": [{"value": deadline_val}]})
+    # Направление (select) — нужно точное значение из enum
+    if result.get("direction"):
+        direction_raw = str(result["direction"]).strip()
+        direction_enum = DIRECTION_ENUM_MAP.get(direction_raw)
+        if not direction_enum:
+            # Попробуем найти по началу строки
+            for key, val in DIRECTION_ENUM_MAP.items():
+                if direction_raw.upper().startswith(key):
+                    direction_enum = val
+                    break
+        if direction_enum:
+            custom_fields.append({"field_id": FIELD_DIRECTION, "values": [{"value": direction_enum}]})
+    # Приоритет (select) — нужно точное значение из enum
+    if result.get("priority"):
+        priority_raw = str(result["priority"]).strip().upper()
+        priority_enum = PRIORITY_ENUM_MAP.get(priority_raw)
+        if not priority_enum:
+            # Попробуем найти по Р1/Р2/Р3/Р4
+            for key, val in PRIORITY_ENUM_MAP.items():
+                if key in priority_raw:
+                    priority_enum = val
+                    break
+        if priority_enum:
+            custom_fields.append({"field_id": FIELD_PRIORITY, "values": [{"value": priority_enum}]})
+    # Источник (select) — "Тендерная площадка" для YaDisk
+    custom_fields.append({"field_id": FIELD_SOURCE, "values": [{"value": "\u0422\u0435\u043d\u0434\u0435\u0440\u043d\u0430\u044f \u043f\u043b\u043e\u0449\u0430\u0434\u043a\u0430"}]})
+    # Ссылка на папку (url)
+    yadisk_url = f"https://disk.yandex.ru/client{folder_path}"
+    custom_fields.append({"field_id": FIELD_DOCS_URL, "values": [{"value": yadisk_url}]})
+    # Уверенность LLM (numeric: 0-100)
+    validation_status = result.get("validation_status", "unknown")
+    confidence_map = {"ok": 90, "partial": 60, "blocked": 30, "unknown": 0}
+    confidence_score = confidence_map.get(validation_status, 0)
+    custom_fields.append({"field_id": FIELD_LLM_CONFIDENCE, "values": [{"value": confidence_score}]})
+    # LLM комментарий (textarea) — статус валидации + warnings
+    llm_comment_parts = [f"validation: {validation_status}"]
+    if result.get("warnings"):
+        llm_comment_parts.append(f"warnings: {', '.join(result['warnings'])}")
+    custom_fields.append({"field_id": FIELD_LLM_COMMENT, "values": [{"value": "\n".join(llm_comment_parts)}]})
+
+    lead_data = {
+        "name": lead_name,
+        "pipeline_id": AMO_PIPELINE_ACTIVE,
+        "status_id": AMO_STATUS_LLM,
+        "custom_fields_values": custom_fields,
+    }
+    if AMO_USER_RESPONSIBLE:
+        lead_data["responsible_user_id"] = AMO_USER_RESPONSIBLE
+
+    try:
+        resp = requests.post(
+            f"{AMO_BASE_URL}/leads",
+            json=[lead_data],
+            headers=AMO_HEADERS,
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            leads = resp.json().get("_embedded", {}).get("leads", [])
+            if leads:
+                lead_id = leads[0]["id"]
+                logger.info(f"  📋 Сделка создана: ID={lead_id}, name='{lead_name}'")
+                return lead_id
+        logger.error(f"Ошибка создания сделки: {resp.status_code} {resp.text[:300]}")
+    except Exception as e:
+        logger.error(f"Исключение при создании сделки: {e}")
+    return None
+
+
 # ═════════════════════════════════════════════════════════════════
 # ОСНОВНАЯ ФУНКЦИЯ (CRON)
 # ═══════════════════════════════════════════════════════════════════
@@ -781,17 +926,18 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                 parsed = ec_module.parse_tender_fields(all_text, all_files)
                 
                 # 3. Валидация + OCR fallback
-                parsed = ec_module.validate_and_fallback(parsed, all_files)
+                pdf_files_list = [f for f in all_files if f.lower().endswith('.pdf')]
+                parsed = ec_module.validate_and_ocr_fallback(parsed, pdf_files_list, all_text)
                 
                 # Маппинг результата в старый формат для обратной совместимости
                 result = {
-                    "customer": parsed.get("customer", customer_hint),
-                    "nmc": parsed.get("nmc", 0),
-                    "direction": parsed.get("direction_hint", "CARBIDE-STANDARD"),
-                    "deadline": parsed.get("deadline", ""),
-                    "priority": parsed.get("priority_hint", "P3"),
-                    "validation_status": parsed.get("validation_status", "unknown"),
-                    "confidence": parsed.get("confidence_scores", {})
+                    "customer": parsed.get("customer") or customer_hint,
+                    "nmc": parsed.get("nmc") or 0,
+                    "direction": parsed.get("direction_hint") or "CARBIDE-STANDARD",
+                    "deadline": parsed.get("deadline") or "",
+                    "priority": parsed.get("priority_hint") or "P3",
+                    "validation_status": parsed.get("validation_status") or "unknown",
+                    "confidence": parsed.get("confidence_scores") or {}
                 }
 
                 # Сохраняем в dedup DB с данными от парсера
@@ -814,6 +960,31 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                 if dedup_result.is_fuzzy_duplicate:
                     result["_fuzzy_warning"] = dedup_result.message
 
+                # ─── Создание сделки в amoCRM ────────────────────
+                lead_id = None
+                if result.get("customer"):
+                    lead_id = _create_amo_lead(result, folder_name, folder_path, date_folder)
+                    if lead_id:
+                        update_tender_status(
+                            conn, folder_path,
+                            status="lead_created",
+                            amo_lead_id=lead_id,
+                            llm_result=json.dumps(result, ensure_ascii=False),
+                        )
+                        dedup_db.update_lead_id(folder_path, lead_id)
+                        # Добавляем заметку со списком файлов
+                        files_note = f"📁 Папка: {folder_path}\n"
+                        files_note += f"📅 Дата: {date_folder}\n"
+                        files_note += f"📊 Файлов: {len(files)}\n"
+                        if result.get('validation_status') != 'ok':
+                            files_note += f"⚠️ Статус валидации: {result['validation_status']}\n"
+                        if dedup_result.is_fuzzy_duplicate:
+                            files_note += f"⚠️ Fuzzy-дубль: {dedup_result.message}\n"
+                        _post_note_to_lead(lead_id, files_note)
+                        stats["leads_created"] = stats.get("leads_created", 0) + 1
+                else:
+                    logger.warning(f"  ⚠️ Заказчик не определён — сделка НЕ создана (folder: {folder_name})")
+
                 stats["details"].append({
                     "name": folder_name,
                     "date": date_folder,
@@ -821,9 +992,10 @@ def run_yadisk_scan(dry_run: bool = True) -> dict:
                     "action": "classified",
                     "result": result,
                     "is_fuzzy": dedup_result.is_fuzzy_duplicate,
+                    "lead_id": lead_id,
                 })
                 
-                logger.info(f"  ✅ Парсинг завершён: статус {result['validation_status']}, заказчик {result['customer']}")
+                logger.info(f"  ✅ Парсинг завершён: статус {result['validation_status']}, заказчик {result['customer']}, lead_id={lead_id}")
 
             except ImportError as e:
                 logger.error(f"Не удалось импортировать extract_and_classify: {e}")

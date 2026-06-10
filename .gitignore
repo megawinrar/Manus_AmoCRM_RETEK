@@ -5,3 +5,4 @@ __pycache__/
 *.log
 data/processed_tenders.db
 data/llm_logs/
+.venv/

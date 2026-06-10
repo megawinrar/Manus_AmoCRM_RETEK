@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ЭКСТРАКЦИЯ ТЕКСТА
 # ═══════════════════════════════════════════════════════════════════
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".rtf", ".txt", ".csv"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".ods", ".rtf", ".txt", ".csv"}
 
 
 def extract_pdf(filepath: str) -> str:
@@ -223,10 +223,42 @@ def extract_doc(filepath: str) -> str:
     return "[ОШИБКА DOC: antiword/catdoc не установлены]"
 
 
+def extract_ods(filepath: str) -> str:
+    """Извлечь данные из ODS (OpenDocument Spreadsheet) через openpyxl или odfpy."""
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(filepath, data_only=True, read_only=True)
+        parts = []
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            parts.append(f"=== Лист: {sheet_name} ===")
+            for row in ws.iter_rows(values_only=True):
+                vals = [str(v) if v is not None else "" for v in row]
+                line = "\t".join(vals)
+                if line.strip():
+                    parts.append(line)
+        wb.close()
+        return "\n".join(parts)
+    except Exception:
+        # Fallback: try reading as zip with content.xml
+        try:
+            import zipfile
+            with zipfile.ZipFile(filepath) as z:
+                if 'content.xml' in z.namelist():
+                    content = z.read('content.xml').decode('utf-8', errors='replace')
+                    # Strip XML tags to get text
+                    text = re.sub(r'<[^>]+>', ' ', content)
+                    text = re.sub(r'\s+', ' ', text).strip()
+                    return text
+        except Exception as e2:
+            return f"[ОШИБКА ODS: {e2}]"
+    return ""
+
+
 def extract_file(filepath: str) -> tuple:
     """
     Извлечь текст из файла. Возвращает (text, time_ms, method).
-    method: 'pdftotext' | 'ocr' | 'python-docx' | 'openpyxl' | 'text' | 'antiword'
+    method: 'pdftotext' | 'ocr' | 'python-docx' | 'openpyxl' | 'text' | 'antiword' | 'ods'
     """
     ext = Path(filepath).suffix.lower()
     t0 = time.time()
@@ -246,6 +278,9 @@ def extract_file(filepath: str) -> tuple:
     elif ext == ".xlsx" or ext == ".xls":
         text = extract_xlsx(filepath)
         method = "openpyxl"
+    elif ext == ".ods":
+        text = extract_ods(filepath)
+        method = "ods"
     elif ext == ".doc":
         text = extract_doc(filepath)
         method = "antiword"
