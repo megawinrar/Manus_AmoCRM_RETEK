@@ -26,3 +26,19 @@
 - VM: 89.169.142.160, user: yc-user, path: /opt/Manus_AmoCRM_RETEK
 - Docker: `docker compose -f deploy/docker-compose.yml up -d --build app`
 - После деплоя проверять только `curl http://localhost:8000/health`
+
+### 6. Тестирование и покрытие
+- Все изменения оборачивать тестами перед коммитом
+- Текущее покрытие: **55%** (417 тестов), цель: >70%
+- Для улучшения покрытия использовать скилл **test-coverage-improver**
+  - Репозиторий: https://github.com/megawinrar/manus-skills/tree/main/test-coverage-improver
+  - Workflow: baseline → приоритизация модулей → написание тестов → фикс багов → коммит
+- Запуск тестов: `python -m pytest tests/ --cov=src --cov-report=term-missing --tb=short -q`
+- Не тестировать одноразовые скрипты (`src/create_custom_fields.py`, `src/rebuild_statuses.py` и т.д.)
+- Фокус на: API layer, cron jobs, handlers, services, infrastructure clients
+
+## Навыки (Skills)
+
+| Навык | Описание | Репозиторий |
+| :--- | :--- | :--- |
+| test-coverage-improver | Анализ покрытия, написание тестов, исправление багов, коммит в GitHub | [manus-skills](https://github.com/megawinrar/manus-skills/tree/main/test-coverage-improver) |
