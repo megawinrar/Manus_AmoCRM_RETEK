@@ -44,7 +44,7 @@ async def amocrm_webhook(
     # 2. Добавление примечания (Действие 3)
     note_id_keys = [k for k in form_data.keys() if k.startswith("notes[add]") and k.endswith("[id]")]
     if note_id_keys:
-        idx = note_id_keys[0].split("][")[2].replace("]", "")
+        idx = note_id_keys[0].split("][")[1]
         lead_id = int(form_data.get(f"notes[add][{idx}][element_id]", 0))
         note_text = form_data.get(f"notes[add][{idx}][text]", "")
         
