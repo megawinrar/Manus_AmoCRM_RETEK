@@ -1,7 +1,7 @@
-# SESSION STATE — Точка продолжения
+# SESSION STATE — RETEK amoCRM Microservice
 
-> Последнее обновление: 10.06.2026 (PATCH12)
-> Коммит: PATCH12 — Расширенный confidence scoring (13 полей) + OCR-fallback
+> Последнее обновление: 10.06.2026 (PATCH16)
+> Коммит: PATCH16 — Production деплой на Yandex Cloud VM
 > Репозиторий: https://github.com/megawinrar/Manus_AmoCRM_RETEK
 
 ---
@@ -134,50 +134,50 @@
 - **OCR-верификация:** точечный OCR региона вокруг ключевого слова при confidence < 0.7
 - **Статусы:** `ok` | `warnings` | `blocked`
 - **Режимы вывода:** терминал / `--json` / `--command` (генерация команды для emulate_llm_with_dedup.py)
-- **Поля с скорингом:**
 
-| Поле | Проверка | Severity |
-|---|---|---|
-| customer | Орг.форма + длина > 10 | block |
-| nmc | 100К < НМЦ < 10 млрд | block |
-| deadline | Год 2024-2030 | block |
-| procedure_number | Наличие | warn |
-| platform | Наличие | warn |
-| position_count | 1 ≤ кол-во ≤ 5000 | warn |
-| equivalent_allowed | Тип bool | warn |
-| gisp_required | Тип bool | warn |
-| procedure_type | Известный тип (котировки/аукцион/конкурс) | warn |
-| subject | Содержит поставка/инструмент + длина | warn |
-| city | Известный город РФ | warn |
-| notice_number | Наличие | warn |
-| direction_hint | Из enum (CARBIDE/HSS/DIAMOND/...) | warn |
+### 14. RAG-система (PATCH13)
+- `scripts/rag_indexer.py` — чанкование (250 токенов, overlap 75) + concurrent embedding + ChromaDB
+- `scripts/rag_search.py` — семантический поиск с keyword boost, query expansion, top_k=10
+- `scripts/pipeline_tender.py` — интеграционный пайплайн: extract → classify → index
+- Яндекс Embeddings API работает (256 dim, text-search-doc/latest)
+- Тендер Promatool: 1058 чанков, стоимость индексации ~1.81₽
+- Стоимость поиска: ~0.001₽/запрос
+- ChromaDB база: `data/chroma_db/`
 
-- **Тест Promatool:** все 13 полей = 1.0, status = ok, OCR не потребовался
-- `scripts/benchmark_extraction.py` — диагностика времени экстракции
+### 15. Деплой-артефакты (PATCH14-15)
+- `deploy/Dockerfile` — production образ (python:3.11-slim + tesseract + poppler)
+- `deploy/docker-compose.yml` — 3 сервиса: app + nginx + certbot
+- `deploy/nginx/nginx.conf` + `deploy/nginx/conf.d/app.conf` — reverse proxy
+- `deploy/setup_vm.sh` — первоначальная настройка VM
+- `deploy/create_env.sh` — шаблон .env с PLACEHOLDER (без секретов в git)
+
+### 16. Production деплой на Yandex Cloud VM (PATCH16) ✅
+- **VM:** 89.169.142.160 (Ubuntu 22.04, Docker 29.5.3)
+- **Репозиторий на VM:** /opt/Manus_AmoCRM_RETEK
+- **Статус контейнеров:**
+  - `retek-amocrm` — Up (healthy) ✅
+  - `retek-nginx` — Up (порты 80, 443) ✅
+  - `retek-certbot` — Up ✅
+- **Health check:** `http://89.169.142.160/health` → `{"status":"ok"}` ✅
+- **Webhook:** `http://89.169.142.160/webhook` (POST) → готов к приёму ✅
+- **Режим:** DRY_RUN=0, LLM_MODE=training
+- **Cron-задачи запущены:** 5 задач (APScheduler)
+- **Webhook URL для amoCRM:** `http://89.169.142.160/webhook`
 
 ---
 
 ## Что НЕ сделано (следующие шаги)
 
-### БЛОКЕР: Яндекс GPT API-ключ не работает
-- Причина: нет активного биллинга в Yandex Cloud
-- Ключ: `<YANDEX_GPT_API_KEY>`
-- Folder ID: `b1gdhvrb9epa1tgt00fj`
-- Нужно: привязать платёжный аккаунт в https://console.yandex.cloud/
-- После этого: протестировать LLM на реальных тендерах
-
 ### Задачи по приоритету
 
 | # | Задача | Приоритет | Зависимость |
 |---|---|---|---|
-| 1 | Привязать биллинг Yandex Cloud | 🔴 | Пользователь |
-| 2 | Протестировать LLM на реальных тендерах (training mode) | 🔴 | После п.1 |
-| 3 | Деплой микросервиса на сервер (Docker/systemd) | 🔴 | — |
-| 4 | Настроить вебхук amoCRM (указать URL сервера) | 🔴 | После п.3 |
-| 5 | Подключить cron_backup.py к APScheduler (03:00 ежедневно) | 🟡 | После п.3 |
-| 6 | Перевести LLM в production после обкатки | 🟡 | После п.2 |
-| 7 | Действие 3 — распознавание из чата (webhook на notes[add]) | 🟡 | После п.4 |
-| 8 | Презентация для команды (уже готова, можно обновить) | 🟢 | — |
+| 1 | **Прописать webhook URL в amoCRM** → `http://89.169.142.160/webhook` | 🔴 | — |
+| 2 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
+| 3 | Действие 3 — распознавание из чата amoCRM (webhook на notes[add]) | 🟡 | — |
+| 4 | Интеграция extract_and_classify.py в cron_yadisk (автопарсинг) | 🟡 | — |
+| 5 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
+| 6 | RAG чат в карточке amoCRM | 🟢 | Будущее |
 
 ---
 
@@ -190,6 +190,7 @@
 5. **Валидация:** warn (предупреждение) + block (для архива)
 6. **ZIP-архивы:** распаковываем, анализируем содержимое
 7. **Объём:** 10-20 тендеров/день
+8. **Деплой:** Docker + nginx, без SSL (нет домена), webhook по IP:80
 
 ---
 
@@ -199,7 +200,8 @@
 |---|---|
 | amoCRM JWT | ✅ Работает (до 29.07.2026) |
 | Яндекс.Диск OAuth | ✅ Работает |
-| Яндекс GPT API | ❌ Ждёт биллинг |
+| Яндекс GPT API | ✅ Работает (ключ в .env) |
+| Yandex Embeddings | ✅ Работает (256 dim) |
 
 ---
 
@@ -215,3 +217,18 @@
 ```
 
 Реальный пример (09.06.2026): 17 тендеров в папке.
+
+---
+
+## Инфраструктура
+
+| Компонент | Значение |
+|---|---|
+| VM IP | 89.169.142.160 |
+| VM OS | Ubuntu 22.04 |
+| Docker | 29.5.3 |
+| Репозиторий на VM | /opt/Manus_AmoCRM_RETEK |
+| Health URL | http://89.169.142.160/health |
+| Webhook URL | http://89.169.142.160/webhook |
+| amoCRM домен | tokutools.amocrm.ru |
+| GitHub | https://github.com/megawinrar/Manus_AmoCRM_RETEK |
