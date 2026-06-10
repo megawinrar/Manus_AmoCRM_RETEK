@@ -197,9 +197,45 @@
 |---|---|---|---|
 | 1 | Обновить токен amoCRM (ждём поддержку) | 🔴 | Блокер |
 | 2 | Проверить Действие 3 end-to-end (после токена) | 🔴 | Токен |
-| 3 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
-| 4 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
-| 5 | RAG чат в карточке amoCRM | 🟢 | Будущее |
+| 3 | **CRM-Audit-Service** — реализовать MVP (см. ниже) | 🔴 | Токен |
+| 4 | Перевести LLM в production mode (LLM_MODE=production) | 🟡 | После обкатки |
+| 5 | SQLite FTS5 для поиска по архиву тендеров (когда будет 50+ тендеров) | 🟢 | — |
+| 6 | RAG чат в карточке amoCRM | 🟢 | Будущее |
+
+### CRM-Audit-Service (репо: [CRM-Audit-Service](https://github.com/megawinrar/CRM-Audit-Service))
+
+**Цель:** Read-only наблюдатель за amoCRM — снимки, диффы, проверка правил, отчёты.
+
+**Статус:** Только каркас (`__init__.py`) + ТЗ (CODEX_TZ_ROADMAP.md). Код не написан.
+
+**Шаги реализации (10 шагов по roadmap):**
+
+| Шаг | Описание |
+|---|---|
+| 1 | Каркас проекта + config/rules.json + field_mapping.json |
+| 2 | Normalizer — приведение сделок к единому формату |
+| 3 | Snapshot storage — сохранение снимков в JSON |
+| 4 | Diff engine — сравнение двух снимков |
+| 5 | Rules engine — проверка нарушений логики |
+| 6 | Report generator — ежедневные/недельные отчёты |
+| 7 | Тесты (normalizer, diff, rules) |
+| 8 | amoCRM read-only client (GET только) |
+| 9 | CLI main.py (snapshot / diff / rules / report / run-once) |
+| 10 | GitHub Actions workflow (ежечасный запуск) |
+
+**Ключевые правила:**
+- MVP ничего не меняет в amoCRM (read-only)
+- Не хранит токены в репозитории
+- Проверяет канонические правила маршрутизации
+- Запуск через GitHub Actions (ежечасно)
+- Артефакты: snapshots/, diffs/, reports/
+
+**Сервис отвечает на вопросы:**
+- Какие сделки зависли?
+- Где нарушена маршрутизация?
+- Какие сотрудники перегружены?
+- Какие правила CRM игнорируются?
+- Где нет следующего действия?
 
 ---
 
